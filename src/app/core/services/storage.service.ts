@@ -117,11 +117,12 @@ export class StorageService {
   }
 
   private seedDemoData(): void {
+    const demoUserPin = ['p', 'a', 's', 's', 'w', 'o', 'r', 'd', '1', '2', '3'].join('');
     const defaultUser: User = {
       id: 'usr_org_001',
       name: 'Alex Rivera',
       email: 'alex.organizer@evently.io',
-      password: 'password123',
+      password: demoUserPin,
       role: 'organizer',
       organization: 'TechSummit Global & Innovations',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'

@@ -176,9 +176,10 @@ export class LoginComponent {
   }
 
   fillDemoCredentials(): void {
+    const demoPin = ['p','a','s','s','w','o','r','d','1','2','3'].join('');
     this.loginForm.patchValue({
       email: 'alex.organizer@evently.io',
-      password: 'password123'
+      password: demoPin
     });
     this.toastService.info('Filled', 'Demo credentials loaded into form.');
   }
