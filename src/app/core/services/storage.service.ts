@@ -399,7 +399,7 @@ export class StorageService {
       }
     ];
 
-    this.saveCurrentUser(defaultUser);
+    // Do NOT auto-login the demo user — let users sign in themselves
     this.saveUsers([defaultUser]);
     this.saveEvents(events);
     this.saveCustomQuestions(customQuestions);
