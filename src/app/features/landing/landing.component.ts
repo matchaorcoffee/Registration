@@ -180,7 +180,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
 
           <div class="grid grid-cols-3 gap-6">
             <div *ngFor="let evt of events" class="event-demo-card">
-              <div class="event-demo-img" [style.backgroundImage]="'url(' + evt.bannerUrl + ')'">
+              <div class="event-demo-img" [style.backgroundImage]="'url(' + evt.bannerUrl + ')'" [style.backgroundPosition]="evt.bannerPosition || 'center'">
                 <app-status-badge [status]="evt.status"></app-status-badge>
               </div>
               <div class="event-demo-body">

@@ -17,7 +17,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
       <div class="container container-narrow">
         <!-- Event Top Header Banner -->
         <div class="event-hero-card">
-          <div class="event-banner-img" [style.backgroundImage]="'url(' + event.bannerUrl + ')'">
+          <div class="event-banner-img" [style.backgroundImage]="'url(' + event.bannerUrl + ')'" [style.backgroundPosition]="event.bannerPosition || 'center'">
             <div class="banner-top-badge">
               <app-status-badge [status]="event.status"></app-status-badge>
               <span class="category-pill">{{ event.category | uppercase }}</span>

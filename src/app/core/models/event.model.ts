@@ -23,6 +23,7 @@ export interface Event {
   description: string;
   category: 'conference' | 'workshop' | 'celebration' | 'seminar' | 'networking' | 'webinar';
   bannerUrl: string;
+  bannerPosition?: string; // CSS background-position, e.g. 'center', 'top', '50% 20%'
   badgeColor?: string;
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm

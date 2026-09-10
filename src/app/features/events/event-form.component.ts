@@ -100,11 +100,31 @@ import { AuthService } from '../../core/services/auth.service';
                 </div>
               </div>
 
-              <!-- Banner Preview -->
+              <!-- Banner Preview + Focal-Point Picker -->
               <div *ngIf="eventForm.get('bannerUrl')?.value" class="banner-preview-wrap mt-3">
-                <div class="banner-preview-img" [style.backgroundImage]="'url(' + eventForm.get('bannerUrl')?.value + ')'">
+                <div
+                  class="banner-preview-img"
+                  [style.backgroundImage]="'url(' + eventForm.get('bannerUrl')?.value + ')'"
+                  [style.backgroundPosition]="eventForm.get('bannerPosition')?.value || 'center'"
+                >
                   <span class="preview-badge">Banner Preview</span>
                   <button type="button" (click)="clearBanner()" class="btn-clear-banner" title="Remove Banner">✕</button>
+                </div>
+
+                <!-- Focal-point picker -->
+                <div class="focal-picker-row">
+                  <span class="focal-label">Image position:</span>
+                  <div class="focal-grid">
+                    <button
+                      *ngFor="let p of bannerPositions"
+                      type="button"
+                      class="focal-dot"
+                      [class.active]="eventForm.get('bannerPosition')?.value === p.value"
+                      [title]="p.label"
+                      (click)="eventForm.get('bannerPosition')?.setValue(p.value)"
+                    ></button>
+                  </div>
+                  <span class="focal-hint">{{ getFocalLabel() }}</span>
                 </div>
               </div>
             </div>
@@ -317,6 +337,50 @@ import { AuthService } from '../../core/services/auth.service';
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
+      transition: background-position 0.25s ease;
+    }
+    .focal-picker-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.45rem 0.75rem;
+      background: var(--flat-gray-50);
+      border-top: 1px solid var(--flat-border);
+    }
+    .focal-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--flat-gray-600);
+      white-space: nowrap;
+    }
+    .focal-hint {
+      font-size: 0.68rem;
+      color: var(--flat-gray-500);
+      white-space: nowrap;
+    }
+    .focal-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 14px);
+      grid-template-rows: repeat(3, 14px);
+      gap: 3px;
+    }
+    .focal-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1.5px solid var(--flat-gray-400);
+      background: var(--flat-white);
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .focal-dot:hover {
+      border-color: var(--flat-primary);
+      background: var(--flat-primary-light);
+    }
+    .focal-dot.active {
+      background: var(--flat-primary);
+      border-color: var(--flat-primary);
     }
     .preview-badge {
       background: rgba(15, 23, 42, 0.85);
@@ -385,6 +449,24 @@ export class EventFormComponent implements OnInit {
   currentOrganizerId = 'usr_org_001';
   isOwner = false;
 
+  /** 9-point focal-point grid (row-major: top-left → bottom-right) */
+  readonly bannerPositions = [
+    { value: 'top left',    label: 'Top Left'     },
+    { value: 'top center',  label: 'Top Center'   },
+    { value: 'top right',   label: 'Top Right'    },
+    { value: 'center left', label: 'Middle Left'  },
+    { value: 'center',      label: 'Center'       },
+    { value: 'center right',label: 'Middle Right' },
+    { value: 'bottom left', label: 'Bottom Left'  },
+    { value: 'bottom center',label:'Bottom Center'},
+    { value: 'bottom right',label: 'Bottom Right' },
+  ];
+
+  getFocalLabel(): string {
+    const val = this.eventForm?.get('bannerPosition')?.value || 'center';
+    return this.bannerPositions.find(p => p.value === val)?.label ?? val;
+  }
+
   constructor(
     private fb: FormBuilder,
     private eventService: EventService,
@@ -418,6 +500,7 @@ export class EventFormComponent implements OnInit {
       tagline: [''],
       category: ['conference', Validators.required],
       bannerUrl: ['https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=80'],
+      bannerPosition: ['center'],
       description: ['', [Validators.required, Validators.minLength(10)]],
       date: [defaultDate, Validators.required],
       startTime: ['09:00', Validators.required],
@@ -451,6 +534,7 @@ export class EventFormComponent implements OnInit {
       tagline: evt.tagline || '',
       category: evt.category,
       bannerUrl: evt.bannerUrl,
+      bannerPosition: evt.bannerPosition || 'center',
       description: evt.description,
       date: evt.date,
       startTime: evt.startTime,

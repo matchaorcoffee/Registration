@@ -19,7 +19,7 @@ import { RsvpBadgeComponent } from '../../shared/components/rsvp-badge/rsvp-badg
         
         <!-- Hero Header -->
         <div class="event-hero-card">
-          <div class="event-banner-img" [style.backgroundImage]="'url(' + event.bannerUrl + ')'">
+          <div class="event-banner-img" [style.backgroundImage]="'url(' + event.bannerUrl + ')'" [style.backgroundPosition]="event.bannerPosition || 'center'">
             <div class="banner-top-badge">
               <app-status-badge [status]="event.status"></app-status-badge>
               <span class="category-pill">{{ event.category | uppercase }}</span>

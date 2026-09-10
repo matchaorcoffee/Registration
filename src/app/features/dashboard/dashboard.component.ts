@@ -94,7 +94,7 @@ import { ModalComponent } from '../../shared/components/modal/modal.component';
         <div class="grid grid-cols-3 gap-6 event-cards-grid">
           <div *ngFor="let evt of filteredEvents" class="flat-event-card">
             <!-- Event Card Banner -->
-            <div class="event-banner-wrap" [style.backgroundImage]="'url(' + evt.bannerUrl + ')'">
+            <div class="event-banner-wrap" [style.backgroundImage]="'url(' + evt.bannerUrl + ')'" [style.backgroundPosition]="evt.bannerPosition || 'center'">
               <div class="banner-overlay">
                 <app-status-badge [status]="evt.status"></app-status-badge>
                 <span class="category-pill">{{ evt.category | uppercase }}</span>
