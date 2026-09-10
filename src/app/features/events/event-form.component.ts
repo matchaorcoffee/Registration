@@ -115,13 +115,17 @@ import { AuthService } from '../../core/services/auth.service';
                   (touchend)="onTouchEnd()"
                 >
                   <img
+                    #bannerImg
                     [src]="eventForm.get('bannerUrl')?.value"
                     class="banner-canvas-img"
-                    [style.transform]="bannerTransform"
+                    [style.width.px]="imgDisplayW"
+                    [style.height.px]="imgDisplayH"
+                    [style.left.px]="bannerOffsetX"
+                    [style.top.px]="bannerOffsetY"
                     draggable="false"
+                    (load)="onImageLoad()"
                     alt="Banner preview"
                   />
-                  <!-- overlay labels -->
                   <span class="preview-badge">Banner Preview · Drag to reposition</span>
                   <button type="button" (click)="clearBanner()" class="btn-clear-banner" title="Remove Banner">✕</button>
                 </div>
@@ -369,12 +373,9 @@ import { AuthService } from '../../core/services/auth.service';
     }
     .banner-canvas-img {
       position: absolute;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
       pointer-events: none;
-      transform-origin: center center;
-      will-change: transform;
+      user-select: none;
+      will-change: left, top, width, height;
     }
     .banner-toolbar {
       display: flex;
@@ -496,31 +497,100 @@ export class EventFormComponent implements OnInit {
   currentOrganizerId = 'usr_org_001';
   isOwner = false;
 
-  // ── Banner editor state ──────────────────────────────────────────────────
-  readonly ZOOM_MIN = 1;
-  readonly ZOOM_MAX = 3;
+  // ── Banner editor ────────────────────────────────────────────────────────
+  @ViewChild('bannerCanvas') bannerCanvasRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('bannerImg')    bannerImgRef!: ElementRef<HTMLImageElement>;
+
+  readonly ZOOM_MIN  = 0.5;   // allow zooming out below "contain"
+  readonly ZOOM_MAX  = 4;
   readonly ZOOM_STEP = 0.1;
 
-  bannerOffsetX = 0;   // px offset, translated to % on save
-  bannerOffsetY = 0;
-  bannerZoom    = 1;
+  // Natural image dimensions (set on load)
+  private imgNatW = 0;
+  private imgNatH = 0;
 
-  // drag tracking
+  // Canvas dimensions (160px tall, full container width)
+  private canvasW = 0;
+  private canvasH = 160;
+
+  // zoom = scale relative to the contain-fit baseline
+  bannerZoom    = 1;
+  bannerOffsetX = 0;   // px, top-left of image inside canvas
+  bannerOffsetY = 0;
+
+  // Computed display dimensions (driven by zoom + natural size)
+  imgDisplayW = 0;
+  imgDisplayH = 0;
+
+  // drag state
   isDragging      = false;
-  private dragStartX = 0;
-  private dragStartY = 0;
+  private dragStartX  = 0;
+  private dragStartY  = 0;
   private dragOriginX = 0;
   private dragOriginY = 0;
 
-  // pinch-to-zoom tracking
+  // pinch state
   private lastPinchDist = 0;
   private lastPinchZoom = 1;
 
-  get bannerTransform(): string {
-    return `translate(${this.bannerOffsetX}px, ${this.bannerOffsetY}px) scale(${this.bannerZoom})`;
+  /** Called when the <img> fires its load event — compute natural size & fit. */
+  onImageLoad(): void {
+    const img = this.bannerImgRef?.nativeElement;
+    if (!img) return;
+    this.imgNatW = img.naturalWidth  || img.width  || 800;
+    this.imgNatH = img.naturalHeight || img.height || 400;
+    this.canvasW = this.bannerCanvasRef?.nativeElement?.offsetWidth || 600;
+    this.canvasH = 160;
+
+    // Check if we have valid saved offsets (non-default edit mode)
+    const hasSaved = this.imgDisplayW !== 0; // -1 = sentinel for edit-mode restore; >0 = already computed
+    if (!hasSaved) {
+      // Default: contain — fit entire image inside canvas
+      this.fitContain();
+    } else {
+      // Re-apply saved zoom so display dims are up to date
+      this._applyZoom(this.bannerZoom);
+    }
   }
 
-  // ── Mouse drag ────────────────────────────────────────────────────────────
+  /** Scale image to fit entirely inside canvas (contain). */
+  private fitContain(): void {
+    this.canvasW = this.bannerCanvasRef?.nativeElement?.offsetWidth || 600;
+    const scaleW = this.canvasW / this.imgNatW;
+    const scaleH = this.canvasH / this.imgNatH;
+    const scale  = Math.min(scaleW, scaleH);   // contain scale (fit both axes)
+    this.bannerZoom   = 1;                      // zoom=1 means "contain"
+    this.imgDisplayW  = Math.round(this.imgNatW * scale);
+    this.imgDisplayH  = Math.round(this.imgNatH * scale);
+    // Centre in canvas
+    this.bannerOffsetX = Math.round((this.canvasW - this.imgDisplayW) / 2);
+    this.bannerOffsetY = Math.round((this.canvasH - this.imgDisplayH) / 2);
+  }
+
+  /** Re-compute display size when zoom changes, keeping the image centred. */
+  private _applyZoom(newZoom: number): void {
+    this.canvasW = this.bannerCanvasRef?.nativeElement?.offsetWidth || 600;
+    const scaleW  = this.canvasW / this.imgNatW;
+    const scaleH  = this.canvasH / this.imgNatH;
+    const baseScale = Math.min(scaleW, scaleH);    // contain baseline
+
+    const oldW = this.imgDisplayW || Math.round(this.imgNatW * baseScale);
+    const oldH = this.imgDisplayH || Math.round(this.imgNatH * baseScale);
+    const newW = Math.round(this.imgNatW * baseScale * newZoom);
+    const newH = Math.round(this.imgNatH * baseScale * newZoom);
+
+    // Keep the visual centre of the image fixed while zooming
+    const cx = this.bannerOffsetX + oldW / 2;
+    const cy = this.bannerOffsetY + oldH / 2;
+
+    this.bannerZoom   = +newZoom.toFixed(2);
+    this.imgDisplayW  = newW;
+    this.imgDisplayH  = newH;
+    this.bannerOffsetX = Math.round(cx - newW / 2);
+    this.bannerOffsetY = Math.round(cy - newH / 2);
+  }
+
+  // ── Mouse drag ───────────────────────────────────────────────────────────
   onDragStart(e: MouseEvent): void {
     if ((e.target as HTMLElement).closest('.btn-clear-banner')) return;
     e.preventDefault();
@@ -539,18 +609,16 @@ export class EventFormComponent implements OnInit {
   }
 
   @HostListener('document:mouseup')
-  onMouseUp(): void {
-    this.isDragging = false;
-  }
+  onMouseUp(): void { this.isDragging = false; }
 
-  // ── Wheel zoom ────────────────────────────────────────────────────────────
+  // ── Scroll-wheel zoom ────────────────────────────────────────────────────
   onWheel(e: WheelEvent): void {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -this.ZOOM_STEP : this.ZOOM_STEP;
-    this.bannerZoom = Math.min(this.ZOOM_MAX, Math.max(this.ZOOM_MIN, +(this.bannerZoom + delta).toFixed(2)));
+    this._applyZoom(Math.min(this.ZOOM_MAX, Math.max(this.ZOOM_MIN, this.bannerZoom + delta)));
   }
 
-  // ── Touch drag + pinch ────────────────────────────────────────────────────
+  // ── Touch drag + pinch ───────────────────────────────────────────────────
   onTouchStart(e: TouchEvent): void {
     if (e.touches.length === 1) {
       this.isDragging  = true;
@@ -559,9 +627,9 @@ export class EventFormComponent implements OnInit {
       this.dragOriginX = this.bannerOffsetX;
       this.dragOriginY = this.bannerOffsetY;
     } else if (e.touches.length === 2) {
-      this.isDragging     = false;
-      this.lastPinchDist  = this.pinchDist(e);
-      this.lastPinchZoom  = this.bannerZoom;
+      this.isDragging    = false;
+      this.lastPinchDist = this.pinchDist(e);
+      this.lastPinchZoom = this.bannerZoom;
     }
   }
 
@@ -573,7 +641,7 @@ export class EventFormComponent implements OnInit {
     } else if (e.touches.length === 2) {
       const dist  = this.pinchDist(e);
       const ratio = dist / this.lastPinchDist;
-      this.bannerZoom = Math.min(this.ZOOM_MAX, Math.max(this.ZOOM_MIN, +(this.lastPinchZoom * ratio).toFixed(2)));
+      this._applyZoom(Math.min(this.ZOOM_MAX, Math.max(this.ZOOM_MIN, this.lastPinchZoom * ratio)));
     }
   }
 
@@ -585,18 +653,22 @@ export class EventFormComponent implements OnInit {
     return Math.sqrt(dx * dx + dy * dy);
   }
 
-  // ── Toolbar actions ───────────────────────────────────────────────────────
-  zoomIn():  void { this.bannerZoom = Math.min(this.ZOOM_MAX, +(this.bannerZoom + this.ZOOM_STEP).toFixed(2)); }
-  zoomOut(): void { this.bannerZoom = Math.max(this.ZOOM_MIN, +(this.bannerZoom - this.ZOOM_STEP).toFixed(2)); }
+  // ── Toolbar ──────────────────────────────────────────────────────────────
+  zoomIn():  void { this._applyZoom(Math.min(this.ZOOM_MAX, this.bannerZoom + this.ZOOM_STEP)); }
+  zoomOut(): void { this._applyZoom(Math.max(this.ZOOM_MIN, this.bannerZoom - this.ZOOM_STEP)); }
 
   onZoomSlider(e: InputEvent): void {
-    this.bannerZoom = +parseFloat((e.target as HTMLInputElement).value).toFixed(2);
+    this._applyZoom(+parseFloat((e.target as HTMLInputElement).value).toFixed(2));
   }
 
   resetBanner(): void {
+    this.imgDisplayW  = 0;   // force fitContain on next load
+    this.imgDisplayH  = 0;
+    this.bannerZoom   = 1;
     this.bannerOffsetX = 0;
     this.bannerOffsetY = 0;
-    this.bannerZoom    = 1;
+    // If image is already loaded, refit immediately
+    if (this.imgNatW > 0) { this.fitContain(); }
   }
 
   // ── Constructor / lifecycle ───────────────────────────────────────────────
@@ -662,6 +734,8 @@ export class EventFormComponent implements OnInit {
     this.bannerOffsetX = evt.bannerOffsetX ?? 0;
     this.bannerOffsetY = evt.bannerOffsetY ?? 0;
     this.bannerZoom    = evt.bannerZoom    ?? 1;
+    // Signal that saved dimensions exist so onImageLoad re-applies zoom instead of fitContain
+    this.imgDisplayW   = evt.bannerOffsetX != null ? -1 : 0;
 
     this.eventForm.patchValue({
       name:                 evt.name,
@@ -728,9 +802,12 @@ export class EventFormComponent implements OnInit {
 
     // Attach banner editor values to the saved event
     const bannerExtra = {
-      bannerOffsetX: this.bannerOffsetX,
-      bannerOffsetY: this.bannerOffsetY,
-      bannerZoom:    this.bannerZoom
+      bannerOffsetX:  this.bannerOffsetX,
+      bannerOffsetY:  this.bannerOffsetY,
+      bannerZoom:     this.bannerZoom,
+      bannerImgW:     this.imgDisplayW  > 0 ? this.imgDisplayW  : undefined,
+      bannerImgH:     this.imgDisplayH  > 0 ? this.imgDisplayH  : undefined,
+      bannerCanvasW:  this.canvasW      > 0 ? this.canvasW      : undefined,
     };
 
     if (this.isEditMode) {

@@ -180,11 +180,11 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
 
           <div class="grid grid-cols-3 gap-6">
             <div *ngFor="let evt of events" class="event-demo-card">
-              <div class="event-demo-img">
-                <img class="banner-img-layer"
-                  [src]="evt.bannerUrl"
-                  [style.transform]="'translate(' + (evt.bannerOffsetX ?? 0) + 'px, ' + (evt.bannerOffsetY ?? 0) + 'px) scale(' + (evt.bannerZoom ?? 1) + ')'"
-                  alt="" aria-hidden="true" />
+              <div class="event-demo-img"
+                [style.backgroundImage]="'url(' + evt.bannerUrl + ')'"
+                [style.backgroundSize]="evt.bannerImgW ? (evt.bannerImgW + 'px ' + evt.bannerImgH + 'px') : 'contain'"
+                [style.backgroundPosition]="evt.bannerImgW ? (evt.bannerOffsetX + 'px ' + evt.bannerOffsetY + 'px') : 'center'"
+              >
                 <app-status-badge class="demo-status-badge" [status]="evt.status"></app-status-badge>
               </div>
               <div class="event-demo-body">
@@ -489,20 +489,8 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
       display: flex;
       align-items: flex-start;
       justify-content: flex-end;
-    }
-    .banner-img-layer {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      pointer-events: none;
-      transform-origin: center center;
-      z-index: 0;
-    }
-    .demo-status-badge {
-      position: relative;
-      z-index: 1;
+      background-repeat: no-repeat;
+      background-color: #111;
     }
     .event-demo-body {
       padding: 1.25rem;

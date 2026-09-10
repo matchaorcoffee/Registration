@@ -94,11 +94,11 @@ import { ModalComponent } from '../../shared/components/modal/modal.component';
         <div class="grid grid-cols-3 gap-6 event-cards-grid">
           <div *ngFor="let evt of filteredEvents" class="flat-event-card">
             <!-- Event Card Banner -->
-            <div class="event-banner-wrap">
-              <img class="banner-img-layer"
-                [src]="evt.bannerUrl"
-                [style.transform]="'translate(' + (evt.bannerOffsetX ?? 0) + 'px, ' + (evt.bannerOffsetY ?? 0) + 'px) scale(' + (evt.bannerZoom ?? 1) + ')'"
-                alt="" aria-hidden="true" />
+            <div class="event-banner-wrap"
+              [style.backgroundImage]="'url(' + evt.bannerUrl + ')'"
+              [style.backgroundSize]="evt.bannerImgW ? (evt.bannerImgW + 'px ' + evt.bannerImgH + 'px') : 'contain'"
+              [style.backgroundPosition]="evt.bannerImgW ? (evt.bannerOffsetX + 'px ' + evt.bannerOffsetY + 'px') : 'center'"
+            >
               <div class="banner-overlay">
                 <app-status-badge [status]="evt.status"></app-status-badge>
                 <span class="category-pill">{{ evt.category | uppercase }}</span>
@@ -325,20 +325,8 @@ import { ModalComponent } from '../../shared/components/modal/modal.component';
       height: 130px;
       position: relative;
       overflow: hidden;
-    }
-    .banner-img-layer {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      pointer-events: none;
-      transform-origin: center center;
-      z-index: 0;
-    }
-    .banner-overlay {
-      position: relative;
-      z-index: 1;
+      background-repeat: no-repeat;
+      background-color: #111;
     }
     .banner-overlay {
       padding: 0.75rem;

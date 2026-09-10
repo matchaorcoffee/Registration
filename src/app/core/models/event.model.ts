@@ -23,9 +23,12 @@ export interface Event {
   description: string;
   category: 'conference' | 'workshop' | 'celebration' | 'seminar' | 'networking' | 'webinar';
   bannerUrl: string;
-  bannerOffsetX?: number; // % offset from center: -50..50, default 0
-  bannerOffsetY?: number; // % offset from center: -50..50, default 0
-  bannerZoom?: number;    // scale multiplier: 1.0 = fit, >1 = zoomed in, default 1
+  bannerOffsetX?: number;  // editor: px left of img inside 160px canvas
+  bannerOffsetY?: number;  // editor: px top  of img inside 160px canvas
+  bannerZoom?: number;     // editor: scale relative to contain baseline (1 = contain)
+  bannerImgW?: number;     // editor: computed display width at save time  (px)
+  bannerImgH?: number;     // editor: computed display height at save time (px)
+  bannerCanvasW?: number;  // editor: canvas width at save time (px)
   badgeColor?: string;
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm
