@@ -25,9 +25,6 @@ import * as XLSX from 'xlsx';
               Upload existing spreadsheet attendee lists, intelligently map varied column names, review duplicate detections, and batch generate secure QR passes.
             </p>
           </div>
-          <button (click)="downloadSampleTemplate()" class="btn btn-outline btn-sm">
-            📥 Download Sample Template (.xlsx)
-          </button>
         </div>
 
         <!-- 4-Stage Stepper -->
@@ -84,12 +81,6 @@ import * as XLSX from 'xlsx';
             📂 Choose Spreadsheet File
           </button>
 
-          <!-- Quick Test Sample Dataset Button -->
-          <div class="quick-demo-import mt-6">
-            <button (click)="loadDemoSpreadsheet()" class="btn btn-secondary btn-sm">
-              ✨ Or Load Sample 10-Attendee Excel Dataset
-            </button>
-          </div>
         </div>
       </div>
 
