@@ -236,7 +236,16 @@ import { AuthService } from '../../core/services/auth.service';
             </div>
             <div class="form-group">
               <label class="form-label">Contact Phone</label>
-              <input type="text" class="form-control" formControlName="contactNumber" />
+              <input
+                type="tel"
+                class="form-control"
+                [class.is-invalid]="isFieldInvalid('contactNumber')"
+                formControlName="contactNumber"
+                placeholder="+1 (555) 234-5678"
+              />
+              <div *ngIf="isFieldInvalid('contactNumber')" class="form-error">
+                Enter a valid phone number (digits, spaces, +, -, (, ) only).
+              </div>
             </div>
           </div>
 
@@ -632,7 +641,7 @@ export class EventFormComponent implements OnInit {
       capacity:             [200, [Validators.required, Validators.min(1)]],
       organizerName:        [currentUser?.name  || 'Alex Rivera',              Validators.required],
       contactEmail:         [currentUser?.email || 'alex.organizer@evently.io', [Validators.required, Validators.email]],
-      contactNumber:        ['+1 (555) 234-5678'],
+      contactNumber:        ['+1 (555) 234-5678', Validators.pattern(/^[0-9+\-()\s.ext]+$/)],
       isWalkInAllowed:      [true],
       isRsvpEnabled:        [true]
     });
