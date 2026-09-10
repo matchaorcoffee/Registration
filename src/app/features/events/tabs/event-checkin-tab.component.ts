@@ -370,7 +370,6 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
               <div *ngIf="field.isCustom" class="form-group mb-3">
                 <label class="form-label text-xs">
                   {{ field.label }}
-                  <span *ngIf="field.isPrimaryKey" class="badge badge-amber text-xs ml-1 font-bold">PRIMARY KEY</span>
                   <span class="required-star">*</span>
                 </label>
                 <input
@@ -387,7 +386,6 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
               <div *ngIf="field.key === 'fullName'" class="form-group mb-3">
                 <label class="form-label text-xs">
                   {{ field.label || 'Full Name' }}
-                  <span *ngIf="field.isPrimaryKey" class="badge badge-amber text-xs ml-1 font-bold">PRIMARY KEY</span>
                   <span class="required-star">*</span>
                 </label>
                 <input type="text" class="form-control" formControlName="fullName" placeholder="Jane Doe" required />
@@ -397,7 +395,6 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
               <div *ngIf="field.key === 'firstName'" class="form-group mb-3">
                 <label class="form-label text-xs">
                   {{ field.label || 'First Name' }}
-                  <span *ngIf="field.isPrimaryKey" class="badge badge-amber text-xs ml-1 font-bold">PRIMARY KEY</span>
                   <span class="required-star">*</span>
                 </label>
                 <input type="text" class="form-control" formControlName="firstName" placeholder="Jane" required />
@@ -407,7 +404,6 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
               <div *ngIf="field.key === 'lastName'" class="form-group mb-3">
                 <label class="form-label text-xs">
                   {{ field.label || 'Last Name' }}
-                  <span *ngIf="field.isPrimaryKey" class="badge badge-amber text-xs ml-1 font-bold">PRIMARY KEY</span>
                   <span class="required-star">*</span>
                 </label>
                 <input type="text" class="form-control" formControlName="lastName" placeholder="Doe" required />
@@ -417,7 +413,6 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
               <div *ngIf="field.key === 'email'" class="form-group mb-3">
                 <label class="form-label text-xs">
                   {{ field.label || 'Email Address' }}
-                  <span *ngIf="field.isPrimaryKey" class="badge badge-amber text-xs ml-1 font-bold">PRIMARY KEY</span>
                   <span class="required-star">*</span>
                 </label>
                 <input type="email" class="form-control" formControlName="email" placeholder="jane@company.com" required />
@@ -427,7 +422,6 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
               <div *ngIf="field.key === 'phone'" class="form-group mb-3">
                 <label class="form-label text-xs">
                   {{ field.label || 'Mobile / Phone' }}
-                  <span *ngIf="field.isPrimaryKey" class="badge badge-amber text-xs ml-1 font-bold">PRIMARY KEY</span>
                   <span class="required-star">*</span>
                 </label>
                 <input type="tel" class="form-control" formControlName="phone" placeholder="+1 555-0000" required />
@@ -437,7 +431,6 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
               <div *ngIf="field.key === 'company'" class="form-group mb-3">
                 <label class="form-label text-xs">
                   {{ field.label || 'Company / Org' }}
-                  <span *ngIf="field.isPrimaryKey" class="badge badge-amber text-xs ml-1 font-bold">PRIMARY KEY</span>
                   <span class="required-star">*</span>
                 </label>
                 <input type="text" class="form-control" formControlName="company" placeholder="Acme Inc." required />
@@ -447,7 +440,6 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
               <div *ngIf="field.key === 'jobTitle'" class="form-group mb-3">
                 <label class="form-label text-xs">
                   {{ field.label || 'Job Title' }}
-                  <span *ngIf="field.isPrimaryKey" class="badge badge-amber text-xs ml-1 font-bold">PRIMARY KEY</span>
                   <span class="required-star">*</span>
                 </label>
                 <input type="text" class="form-control" formControlName="jobTitle" placeholder="Lead Engineer" required />
