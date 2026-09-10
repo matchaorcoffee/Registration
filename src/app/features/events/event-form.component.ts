@@ -533,24 +533,23 @@ export class EventFormComponent implements OnInit {
   private lastPinchDist = 0;
   private lastPinchZoom = 1;
 
-  /** Called when the <img> fires its load event — compute natural size & fit. */
+  /** Called when the <img> fires its load event — record natural dims; apply saved state or fitContain. */
   onImageLoad(): void {
     const img = this.bannerImgRef?.nativeElement;
     if (!img) return;
     this.imgNatW = img.naturalWidth  || img.width  || 800;
     this.imgNatH = img.naturalHeight || img.height || 400;
-    this.canvasW = this.bannerCanvasRef?.nativeElement?.offsetWidth || 600;
+    this.canvasW = this.bannerCanvasRef?.nativeElement?.offsetWidth || this.canvasW || 600;
     this.canvasH = 160;
 
-    // Check if we have valid saved offsets (non-default edit mode)
-    const hasSaved = this.imgDisplayW !== 0; // -1 = sentinel for edit-mode restore; >0 = already computed
-    if (!hasSaved) {
-      // Default: contain — fit entire image inside canvas
-      this.fitContain();
-    } else {
-      // Re-apply saved zoom so display dims are up to date
-      this._applyZoom(this.bannerZoom);
+    // If imgDisplayW > 0, the saved pixel dimensions have already been restored
+    // (set in loadEventData). Just trust them — do NOT recalculate.
+    if (this.imgDisplayW > 0) {
+      return;  // saved state is authoritative; nothing to recompute
     }
+
+    // imgDisplayW === 0 → fresh upload or new event → fit-contain
+    this.fitContain();
   }
 
   /** Scale image to fit entirely inside canvas (contain). */
@@ -730,12 +729,14 @@ export class EventFormComponent implements OnInit {
     const currentUser = this.authService.currentUserValue;
     this.isOwner = !!currentUser && evt.organizerId === currentUser.id;
 
-    // Restore banner editor state from saved values
+    // Restore all banner editor state from saved values.
+    // When imgDisplayW > 0, onImageLoad will trust these values and skip recomputation.
     this.bannerOffsetX = evt.bannerOffsetX ?? 0;
     this.bannerOffsetY = evt.bannerOffsetY ?? 0;
     this.bannerZoom    = evt.bannerZoom    ?? 1;
-    // Signal that saved dimensions exist so onImageLoad re-applies zoom instead of fitContain
-    this.imgDisplayW   = evt.bannerOffsetX != null ? -1 : 0;
+    this.imgDisplayW   = evt.bannerImgW   ?? 0;
+    this.imgDisplayH   = evt.bannerImgH   ?? 0;
+    this.canvasW       = evt.bannerCanvasW ?? 0;
 
     this.eventForm.patchValue({
       name:                 evt.name,
@@ -800,14 +801,14 @@ export class EventFormComponent implements OnInit {
     this.isSubmitting = true;
     const formVal = this.eventForm.value;
 
-    // Attach banner editor values to the saved event
+    // Attach all banner editor pixel values so they can be restored exactly on next edit.
     const bannerExtra = {
       bannerOffsetX:  this.bannerOffsetX,
       bannerOffsetY:  this.bannerOffsetY,
       bannerZoom:     this.bannerZoom,
-      bannerImgW:     this.imgDisplayW  > 0 ? this.imgDisplayW  : undefined,
-      bannerImgH:     this.imgDisplayH  > 0 ? this.imgDisplayH  : undefined,
-      bannerCanvasW:  this.canvasW      > 0 ? this.canvasW      : undefined,
+      bannerImgW:     this.imgDisplayW > 0 ? this.imgDisplayW : undefined,
+      bannerImgH:     this.imgDisplayH > 0 ? this.imgDisplayH : undefined,
+      bannerCanvasW:  this.canvasW     > 0 ? this.canvasW     : undefined,
     };
 
     if (this.isEditMode) {
