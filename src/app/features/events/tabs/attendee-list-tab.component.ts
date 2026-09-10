@@ -215,7 +215,48 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
               </td>
             </tr>
 
-            <tr *ngIf="filteredAttendees.length === 0">
+            <!-- Case 1: Genuinely empty — no registrations at all -->
+            <tr *ngIf="filteredAttendees.length === 0 && attendees.length === 0">
+              <td [attr.colspan]="(configColumns.length > 0 ? 6 : 7) + configColumns.length">
+                <div class="empty-attendees-prompt">
+                  <div class="empty-prompt-icon">👥</div>
+                  <h3 class="empty-prompt-title">No attendees are currently registered for this event.</h3>
+                  <p class="empty-prompt-sub" *ngIf="emptyAction === 'idle'">Are all attendees expected to be walk-ins?</p>
+
+                  <!-- Initial question buttons -->
+                  <div class="empty-prompt-actions" *ngIf="emptyAction === 'idle'">
+                    <a
+                      [routerLink]="['/event', event!.id, 'rsvp']"
+                      target="_blank"
+                      class="btn btn-primary"
+                      (click)="emptyAction = 'walkin'"
+                    >
+                      ✅ Yes, all are walk-ins
+                    </a>
+                    <button type="button" class="btn btn-secondary" (click)="emptyAction = 'add'">
+                      📋 No, I need to add attendees
+                    </button>
+                  </div>
+
+                  <!-- Add attendees options -->
+                  <div *ngIf="emptyAction === 'add'" class="empty-prompt-add">
+                    <p class="empty-prompt-sub">Choose how you'd like to add attendees:</p>
+                    <div class="empty-prompt-actions">
+                      <a [routerLink]="['/events', event!.id, 'import']" class="btn btn-primary">
+                        📁 Import from Excel
+                      </a>
+                      <a [routerLink]="['/event', event!.id, 'register']" target="_blank" class="btn btn-secondary">
+                        ✍️ Register Attendee Manually
+                      </a>
+                    </div>
+                    <button type="button" class="btn-text-link mt-3" (click)="emptyAction = 'idle'">← Back</button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Case 2: Attendees exist but filters/search hides them -->
+            <tr *ngIf="filteredAttendees.length === 0 && attendees.length > 0">
               <td [attr.colspan]="(configColumns.length > 0 ? 6 : 7) + configColumns.length" class="text-center py-8 text-muted">
                 No attendees match the current filters or search criteria.
               </td>
@@ -391,6 +432,55 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
       border-color: var(--flat-primary);
     }
     .py-8 { padding: 2rem 0; }
+    .empty-attendees-prompt {
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .empty-prompt-icon {
+      font-size: 2.5rem;
+      line-height: 1;
+      margin-bottom: 0.25rem;
+    }
+    .empty-prompt-title {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--flat-dark);
+      margin: 0;
+    }
+    .empty-prompt-sub {
+      font-size: 0.875rem;
+      color: var(--flat-gray-600);
+      margin: 0;
+    }
+    .empty-prompt-actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 0.5rem;
+    }
+    .empty-prompt-add {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .btn-text-link {
+      background: none;
+      border: none;
+      color: var(--flat-primary);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+    }
+    .btn-text-link:hover { opacity: 0.75; }
+    .mt-3 { margin-top: 0.75rem; }
   `]
 })
 export class AttendeeListTabComponent implements OnInit, OnDestroy {
@@ -409,6 +499,9 @@ export class AttendeeListTabComponent implements OnInit, OnDestroy {
     }
   };
   private onWindowFocus = () => this.zone.run(() => this.registrationService.refreshFromStorage());
+
+  /** Tracks which empty-state panel is shown: idle = question, add = add-options, walkin = navigated away */
+  emptyAction: 'idle' | 'add' | 'walkin' = 'idle';
 
   searchQuery = '';
   filterSource: 'all' | RegistrationSource = 'all';
