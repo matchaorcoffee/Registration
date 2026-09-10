@@ -151,6 +151,7 @@ export class StorageService {
         status: 'registration-open',
         isWalkInAllowed: true,
         isRsvpEnabled: true,
+          isQrEnabled: true,
         confirmationMessage: 'Thank you for registering! Please present this QR code pass at Registration Desk 3 on event morning.',
         createdAt: new Date(Date.now() - 14 * 86400000).toISOString(),
         updatedAt: new Date().toISOString()
@@ -177,6 +178,7 @@ export class StorageService {
         status: 'registration-open',
         isWalkInAllowed: true,
         isRsvpEnabled: true,
+          isQrEnabled: true,
         confirmationMessage: 'Welcome to the workshop! Pre-requisite repository instructions have been dispatched.',
         createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
         updatedAt: new Date().toISOString()
@@ -203,6 +205,7 @@ export class StorageService {
         status: 'registration-open',
         isWalkInAllowed: false,
         isRsvpEnabled: true,
+          isQrEnabled: true,
         confirmationMessage: 'We look forward to celebrating with you! Formal / Cocktail attire requested.',
         createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
         updatedAt: new Date().toISOString()

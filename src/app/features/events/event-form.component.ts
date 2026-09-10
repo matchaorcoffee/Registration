@@ -1,7 +1,10 @@
 import { Component, OnInit, HostListener, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { Subject, of } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { EventService } from '../../core/services/event.service';
 import { ToastService } from '../../core/services/toast.service';
 import { CustomQuestionBuilderComponent } from '../../shared/components/custom-question-builder/custom-question-builder.component';
@@ -11,7 +14,7 @@ import { AuthService } from '../../core/services/auth.service';
 @Component({
   selector: 'app-event-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, CustomQuestionBuilderComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, CustomQuestionBuilderComponent],
   template: `
     <div class="event-form-page container container-narrow">
       <div class="form-page-header">
@@ -197,12 +200,43 @@ import { AuthService } from '../../core/services/auth.service';
 
             <div class="form-group">
               <label class="form-label">Physical Address <span class="required-star">*</span></label>
-              <input 
-                type="text" 
-                class="form-control" 
-                formControlName="address" 
-                placeholder="e.g. 500 Technology Dr, San Francisco, CA" 
-              />
+              <!-- Photon location search (live autocomplete, no API key) -->
+              <div style="position:relative;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:18px;flex-shrink:0;">📍</span>
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="address"
+                    placeholder="Search venue, landmark or address…"
+                    (input)="onPhotonInput($any($event))"
+                    (keydown.escape)="photonResults = []"
+                    autocomplete="off"
+                    style="flex:1;"
+                  />
+                  <span *ngIf="photonLoading" style="font-size:12px;color:#57606a;white-space:nowrap;flex-shrink:0;">Searching…</span>
+                </div>
+                <!-- Live suggestion dropdown -->
+                <div
+                  *ngIf="photonResults.length"
+                  style="position:absolute;top:100%;left:0;right:0;z-index:1000;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.12);max-height:260px;overflow-y:auto;margin-top:2px;"
+                >
+                  <div
+                    *ngFor="let r of photonResults"
+                    (click)="selectPhotonResult(r)"
+                    style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f3f4f6;font-size:13px;line-height:1.5;"
+                    onmouseover="this.style.background='#f7f8fa'"
+                    onmouseout="this.style.background='#fff'"
+                  >
+                    <div style="font-weight:600;color:#1f2328;">{{ r.name }}</div>
+                    <div style="color:#57606a;font-size:12px;">{{ r.address }}</div>
+                  </div>
+                  <div
+                    (click)="photonResults = []"
+                    style="padding:7px 14px;font-size:11px;color:#57606a;cursor:pointer;text-align:right;background:#fafafa;"
+                  >✕ Close</div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -253,7 +287,7 @@ import { AuthService } from '../../core/services/auth.service';
             </div>
           </div>
 
-          <div class="flex gap-6 items-center p-3 bg-gray-50 border rounded-md">
+          <div class="flex gap-6 items-center p-3 bg-gray-50 border rounded-md flex-wrap">
             <label class="toggle-control flex items-center gap-2">
               <input type="checkbox" formControlName="isWalkInAllowed" />
               <span class="font-bold text-sm">Allow On-Site Walk-In Registrations</span>
@@ -262,6 +296,11 @@ import { AuthService } from '../../core/services/auth.service';
             <label class="toggle-control flex items-center gap-2">
               <input type="checkbox" formControlName="isRsvpEnabled" />
               <span class="font-bold text-sm">Enable Public RSVP Page</span>
+            </label>
+
+            <label class="toggle-control flex items-center gap-2">
+              <input type="checkbox" formControlName="isQrEnabled" />
+              <span class="font-bold text-sm">Enable QR Pass</span>
             </label>
           </div>
         </div>
@@ -497,6 +536,15 @@ export class EventFormComponent implements OnInit {
   currentOrganizerId = 'usr_org_001';
   isOwner = false;
 
+  // ── Photon location search ────────────────────────────────────────────────
+  photonQuery = '';
+  photonLoading = false;
+  photonResults: Array<{ name: string; address: string; lat: number; lng: number }> = [];
+  private photonSubject = new Subject<string>();
+  // Stored coords from Photon selection
+  private selectedLat: number | null = null;
+  private selectedLng: number | null = null;
+
   // ── Banner editor ────────────────────────────────────────────────────────
   @ViewChild('bannerCanvas') bannerCanvasRef!: ElementRef<HTMLDivElement>;
   @ViewChild('bannerImg')    bannerImgRef!: ElementRef<HTMLImageElement>;
@@ -677,11 +725,71 @@ export class EventFormComponent implements OnInit {
     private router: Router,
     private route: ActivatedRoute,
     private toastService: ToastService,
-    private authService: AuthService
+    private authService: AuthService,
+    private http: HttpClient
   ) {}
+
+  // ── Photon (OpenStreetMap) live search — no API key, completely free ───────
+  private initPhotonSearch(): void {
+    this.photonSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(q => {
+        if (!q.trim()) {
+          this.photonLoading = false;
+          this.photonResults = [];
+          return of(null);
+        }
+        this.photonLoading = true;
+        return this.http.get<any>(
+          `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=en`
+        ).pipe(
+          catchError(() => {
+            this.photonLoading = false;
+            this.photonResults = [];
+            return of(null);
+          })
+        );
+      })
+    ).subscribe((res: any) => {
+      this.photonLoading = false;
+      if (!res?.features) return;
+      this.photonResults = res.features.map((f: any) => {
+        const p = f.properties || {};
+        const street = p.street
+          ? p.street + (p.housenumber ? ' ' + p.housenumber : '')
+          : '';
+        const addrParts = [street, p.city || p.town || p.village, p.state, p.country]
+          .filter(Boolean);
+        return {
+          name: p.name || p.city || p.country || 'Unknown',
+          address: addrParts.join(', '),
+          lat: f.geometry?.coordinates?.[1] ?? 0,
+          lng: f.geometry?.coordinates?.[0] ?? 0
+        };
+      });
+    });
+  }
+
+  onPhotonInput(event: any): void {
+    const val = (event.target as HTMLInputElement).value;
+    this.photonSubject.next(val);
+  }
+
+  selectPhotonResult(r: { name: string; address: string; lat: number; lng: number }): void {
+    const fullAddress = [r.name, r.address].filter(Boolean).join(', ');
+    this.eventForm.patchValue({ address: fullAddress });
+    if (!this.eventForm.get('venue')?.value && r.name) {
+      this.eventForm.patchValue({ venue: r.name });
+    }
+    this.selectedLat = r.lat;
+    this.selectedLng = r.lng;
+    this.photonResults = [];
+  }
 
   ngOnInit(): void {
     this.initForm();
+    this.initPhotonSearch();
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEditMode = true;
@@ -714,7 +822,8 @@ export class EventFormComponent implements OnInit {
       contactEmail:         [currentUser?.email || 'alex.organizer@evently.io', [Validators.required, Validators.email]],
       contactNumber:        ['+1 (555) 234-5678', Validators.pattern(/^[0-9+\-()\s.ext]+$/)],
       isWalkInAllowed:      [true],
-      isRsvpEnabled:        [true]
+      isRsvpEnabled:        [true],
+      isQrEnabled:          [true]
     });
   }
 
@@ -755,8 +864,13 @@ export class EventFormComponent implements OnInit {
       contactEmail:         evt.contactEmail,
       contactNumber:        evt.contactNumber,
       isWalkInAllowed:      evt.isWalkInAllowed,
-      isRsvpEnabled:        evt.isRsvpEnabled
+      isRsvpEnabled:        evt.isRsvpEnabled,
+      isQrEnabled:          evt.isQrEnabled ?? true
     });
+
+    // Restore lat/lng so they're preserved on re-save
+    this.selectedLat = evt.latitude ?? null;
+    this.selectedLng = evt.longitude ?? null;
 
     this.customQuestions = this.eventService.getCustomQuestionsForEvent(id);
   }
@@ -811,8 +925,13 @@ export class EventFormComponent implements OnInit {
       bannerCanvasW:  this.canvasW     > 0 ? this.canvasW     : undefined,
     };
 
+    const coordsExtra = {
+      latitude:  this.selectedLat  ?? undefined,
+      longitude: this.selectedLng ?? undefined,
+    };
+
     if (this.isEditMode) {
-      this.eventService.updateEvent(this.eventId, { ...formVal, ...bannerExtra });
+      this.eventService.updateEvent(this.eventId, { ...formVal, ...bannerExtra, ...coordsExtra });
       this.eventService.saveCustomQuestionsForEvent(this.eventId, this.customQuestions);
       this.toastService.success('Event Updated', 'Changes saved successfully.');
       this.router.navigate(['/events', this.eventId]);
@@ -820,6 +939,7 @@ export class EventFormComponent implements OnInit {
       const created = this.eventService.createEvent({
         ...formVal,
         ...bannerExtra,
+        ...coordsExtra,
         organizerId: this.currentOrganizerId,
         badgeColor: '#2563eb'
       }, this.customQuestions);

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -18,8 +18,8 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
     <div class="lookup-wrapper container container-narrow">
       <div class="lookup-header text-center">
         <span class="lookup-tag">ATTENDEE SELF-SERVICE</span>
-        <h1 class="page-title">Find My Registration & QR Pass</h1>
-        <p class="text-muted">Enter your registered email address or Registration ID (e.g. EVT-2026-000101) to retrieve your digital pass.</p>
+        <h1 class="page-title">Find My Registration</h1>
+        <p class="text-muted">Enter your registered email address or Registration ID (e.g. EVT-2026-000101) to retrieve your registration details.</p>
       </div>
 
       <!-- Search Card -->
@@ -86,14 +86,20 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
               ✓ Checked in at event on <strong>{{ formatDateTime(reg.checkInTime) }}</strong>
             </div>
 
-            <!-- QR Code Pass (Only for Attending / Maybe) -->
-            <div class="qr-embed-area mt-4" *ngIf="reg.rsvpStatus !== 'declined'">
+            <!-- QR Code Pass (Only when QR is enabled for the event and token exists) -->
+            <div class="qr-embed-area mt-4" *ngIf="reg.rsvpStatus !== 'declined' && reg.qrToken && isQrEnabled(reg.eventId)">
               <app-qr-display
                 [token]="reg.qrToken"
                 [guestName]="reg.firstName + ' ' + reg.lastName"
                 [regId]="reg.id"
                 [showActions]="true"
               ></app-qr-display>
+            </div>
+
+            <!-- No QR pass message when QR is disabled -->
+            <div class="p-4 bg-gray-50 border rounded-lg text-center mt-4" *ngIf="reg.rsvpStatus !== 'declined' && !isQrEnabled(reg.eventId)">
+              <span class="text-gray-600 font-bold text-sm">✓ Registration Confirmed</span>
+              <p class="text-xs text-muted mt-1">Present this registration ID at the event entrance for manual check-in.</p>
             </div>
 
             <div class="p-4 bg-coral-light border rounded-lg text-center mt-4" *ngIf="reg.rsvpStatus === 'declined'">
@@ -245,6 +251,11 @@ export class RegistrationLookupComponent {
 
   getEvent(eventId: string): Event | undefined {
     return this.eventService.getEventById(eventId);
+  }
+
+  isQrEnabled(eventId: string): boolean {
+    const evt = this.eventService.getEventById(eventId);
+    return evt?.isQrEnabled !== false;
   }
 
   formatDateTime(iso?: string): string {

@@ -182,12 +182,22 @@ export class ExcelImportService {
       }
 
       const errors: string[] = [];
+      const requiredCols = new Set(mapping.requiredColumns || []);
 
-      // Validate that all mapped columns have non-empty values
-      // Custom columns
+      // Validate required standard columns
+      if (requiredCols.has('firstName') && !firstName) errors.push('"First Name" is required but is empty');
+      if (requiredCols.has('lastName') && !lastName) errors.push('"Last Name" is required but is empty');
+      if (requiredCols.has('fullName') && !firstName && !lastName) errors.push('"Full Name" is required but is empty');
+      if (requiredCols.has('email') && !email) errors.push('"Email" is required but is empty');
+      if (requiredCols.has('phone') && !phone) errors.push('"Phone" is required but is empty');
+      if (requiredCols.has('company') && !company) errors.push('"Company" is required but is empty');
+      if (requiredCols.has('jobTitle') && !jobTitle) errors.push('"Job Title" is required but is empty');
+      if (requiredCols.has('dietary') && !dietary) errors.push('"Dietary Preferences" is required but is empty');
+
+      // Validate required custom columns
       if (mapping.customColumns && mapping.customColumns.length) {
         for (const col of mapping.customColumns) {
-          if (col.sheetHeader) {
+          if (requiredCols.has(col.id) && col.sheetHeader) {
             const val = row[col.sheetHeader] !== undefined ? String(row[col.sheetHeader]).trim() : '';
             if (!val) {
               errors.push(`"${col.fieldLabel}" is required but is empty`);
@@ -195,11 +205,6 @@ export class ExcelImportService {
           }
         }
       }
-      // Standard mapped columns
-      if (mapping.firstName && !firstName) errors.push('"First Name" is required but is empty');
-      if (mapping.lastName && !lastName && !mapping.fullName) errors.push('"Last Name" is required but is empty');
-      if (mapping.fullName && !firstName && !lastName) errors.push('"Full Name" is required but is empty');
-      if (mapping.email && !email) errors.push('"Email" is required but is empty');
 
       // If email is provided, validate its format
       if (email && !emailRegex.test(email)) {
@@ -254,7 +259,8 @@ export class ExcelImportService {
         isValid,
         errors,
         isDuplicate,
-        duplicateResolution: isDuplicate ? 'skip' : undefined
+        duplicateResolution: isDuplicate ? 'skip' : undefined,
+        invalidResolution: !isValid ? 'remove' : undefined
       });
     }
 

@@ -47,8 +47,9 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
 
       <!-- PRIMARY ZERO-FRICTION ACTION TOGGLE (Mobile & Tablet First) -->
       <div class="primary-action-grid mb-6">
-        <button 
-          (click)="activeMode = 'scan'" 
+        <button
+          *ngIf="event.isQrEnabled !== false"
+          (click)="activeMode = 'scan'"
           class="action-btn scan-btn"
           [class.active]="activeMode === 'scan'"
         >
@@ -84,8 +85,8 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
         </button>
       </div>
 
-      <!-- MODE 1: QR SCANNER SECTION -->
-      <div *ngIf="activeMode === 'scan'" class="scanner-section">
+      <!-- MODE 1: QR SCANNER SECTION (only when QR is enabled) -->
+      <div *ngIf="activeMode === 'scan' && event.isQrEnabled !== false" class="scanner-section">
         <div class="grid grid-cols-2 gap-6">
           
           <!-- Scanner Camera / Input Box -->
@@ -864,6 +865,10 @@ export class EventCheckInTabComponent implements OnInit {
     const eventId = this.route.parent?.snapshot.paramMap.get('id');
     if (eventId) {
       this.event = this.eventService.getEventById(eventId);
+      // Default to manual search when QR is disabled for this event
+      if (this.event?.isQrEnabled === false) {
+        this.activeMode = 'manual';
+      }
       this.loadEventData(eventId);
       this.loadWalkInFieldsConfig(eventId);
     }
@@ -1010,20 +1015,61 @@ export class EventCheckInTabComponent implements OnInit {
     if (!this.event || this.walkInForm.invalid) return;
 
     const val = this.walkInForm.value;
-    const formattedCustom = Object.entries(this.walkInCustomAnswers).map(([qid, ans]) => {
-      const q = this.eventCustomQuestions.find(x => x.id === qid);
-      return {
+
+    // Derive firstName / lastName from whichever name field was used
+    let firstName: string = (val.firstName || '').trim();
+    let lastName: string = (val.lastName || '').trim();
+
+    // If the event uses fullName field, split it
+    if (!firstName && !lastName && val.fullName) {
+      const parts = (val.fullName as string).trim().split(/\s+/);
+      firstName = parts[0] || '';
+      lastName = parts.slice(1).join(' ') || '';
+    }
+
+    // If still empty, pull from custom mapped fields that look like a name
+    if (!firstName && !lastName) {
+      const nameField = this.walkInOrderedFields.find(f =>
+        f.key === 'fullName' || f.label.toLowerCase().includes('name')
+      );
+      if (nameField && this.walkInCustomAnswers[nameField.key]) {
+        const parts = this.walkInCustomAnswers[nameField.key].trim().split(/\s+/);
+        firstName = parts[0] || '';
+        lastName = parts.slice(1).join(' ') || '';
+      }
+    }
+
+    // Fallback so the record is never saved with a blank name
+    if (!firstName && !lastName) {
+      firstName = 'Walk-In';
+      lastName = 'Guest';
+    }
+
+    // Build customAnswers — include custom mapped fields AND event-level questions
+    const formattedCustom: any[] = [];
+
+    for (const [qid, ans] of Object.entries(this.walkInCustomAnswers)) {
+      if (!ans) continue;
+      // Check event custom questions first
+      const eventQ = this.eventCustomQuestions.find(x => x.id === qid);
+      if (eventQ) {
+        formattedCustom.push({ questionId: qid, questionText: eventQ.question, answer: ans });
+        continue;
+      }
+      // Fall back to mapping config label
+      const mappedField = this.walkInOrderedFields.find(f => f.key === qid);
+      formattedCustom.push({
         questionId: qid,
-        questionText: q?.question || 'Question',
+        questionText: mappedField?.label || qid,
         answer: ans
-      };
-    });
+      });
+    }
 
     const newReg = this.registrationService.registerWalkIn({
       eventId: this.event.id,
-      firstName: val.firstName,
-      lastName: val.lastName,
-      email: val.email,
+      firstName,
+      lastName,
+      email: (val.email || '').trim(),
       phone: val.phone,
       company: val.company,
       jobTitle: val.jobTitle,

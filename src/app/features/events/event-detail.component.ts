@@ -79,7 +79,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
         <a [routerLink]="['/events', event.id, 'attendees']" routerLinkActive="active" class="tab-item">
           👥 Attendees ({{ registrationsCount }})
         </a>
-        <a [routerLink]="['/events', event.id, 'check-in']" routerLinkActive="active" class="tab-item highlight-tab">
+        <a *ngIf="event.isQrEnabled !== false" [routerLink]="['/events', event.id, 'check-in']" routerLinkActive="active" class="tab-item highlight-tab">
           📷 Fast QR Check-In
         </a>
         <a [routerLink]="['/events', event.id, 'import']" routerLinkActive="active" class="tab-item">

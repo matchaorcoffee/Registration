@@ -18,14 +18,14 @@ import { StatusBadgeComponent } from '../../../shared/components/status-badge/st
       <div class="quick-actions-bar flat-card">
         <div class="flex items-center gap-3">
           <span class="action-bar-label">Event Day Actions:</span>
-          <a [routerLink]="['/events', event.id, 'check-in']" class="btn btn-emerald">
+          <a *ngIf="event.isQrEnabled !== false" [routerLink]="['/events', event.id, 'check-in']" class="btn btn-emerald">
             📷 Open QR Check-In Terminal
           </a>
           <a [routerLink]="['/events', event.id, 'import']" class="btn btn-secondary">
             📁 Import Excel Attendees
           </a>
-          <a [routerLink]="['/event', event.id, 'rsvp']" target="_blank" class="btn btn-primary">
-            🔗 Attendee RSVP Portal
+          <a [routerLink]="['/event', event.id, 'confirm']" target="_blank" class="btn btn-primary">
+            ✅ Confirm Attendance
           </a>
           <a [routerLink]="['/event', event.id, 'register']" target="_blank" class="btn btn-outline">
             ↗ Public Registration Page

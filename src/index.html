@@ -10,6 +10,28 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <!-- GitHub Pages SPA routing: decode the redirect from 404.html -->
+  <script>
+    (function() {
+      var redirect = window.location.search.slice(1);
+      if (redirect) {
+        var decoded = {};
+        redirect.split('&').forEach(function(part) {
+          var eq = part.indexOf('=');
+          var key = part.slice(0, eq);
+          var val = eq >= 0 ? decodeURIComponent(part.slice(eq + 1)) : '';
+          decoded[key] = val;
+        });
+        if (decoded.p !== undefined) {
+          var path = decoded.p.replace(/~and~/g, '&');
+          var query = decoded.q ? '?' + decoded.q.replace(/~and~/g, '&') : '';
+          // path has no leading slash; add one separator only when path is non-empty
+          var fullPath = '/Registration/' + (path ? path : '') + query;
+          window.history.replaceState(null, null, fullPath);
+        }
+      }
+    })();
+  </script>
 </head>
 <body>
   <app-root></app-root>

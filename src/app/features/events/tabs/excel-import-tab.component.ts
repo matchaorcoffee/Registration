@@ -119,72 +119,92 @@ import * as XLSX from 'xlsx';
             </div>
           </div>
 
-          <!-- Mapping Rows List with Reordering -->
-          <div class="mapping-grid">
+          <!-- Mapping Rows List with Drag-and-Drop Reordering -->
+          <div class="mapping-list">
+            <!-- Column header labels -->
+            <div class="mapping-list-header">
+              <span></span><!-- drag handle -->
+              <span>Column Name</span>
+              <span>Maps To (Spreadsheet Header)</span>
+              <span class="header-required">Required / Optional</span>
+              <span></span><!-- delete -->
+            </div>
+
             <div
               *ngFor="let row of mappingRows; let i = index"
-              class="mapping-row"
-              [class.custom-field-row]="row.isCustom"
+              class="mapping-row-card"
+              [class.custom-row]="row.isCustom"
+              [class.drag-over]="dragOverIndex === i"
+              [class.dragging]="dragSourceIndex === i"
+              draggable="true"
+              (dragstart)="onRowDragStart($event, i)"
+              (dragover)="onRowDragOver($event, i)"
+              (dragleave)="onRowDragLeave($event)"
+              (drop)="onRowDrop($event, i)"
+              (dragend)="onRowDragEnd()"
             >
-              <div class="reorder-controls">
-                <button
-                  type="button"
-                  class="btn-icon-tiny"
-                  (click)="moveRowUp(i)"
-                  [disabled]="i === 0"
-                  title="Move Up"
-                >▲</button>
-                <button
-                  type="button"
-                  class="btn-icon-tiny"
-                  (click)="moveRowDown(i)"
-                  [disabled]="i === mappingRows.length - 1"
-                  title="Move Down"
-                >▼</button>
+              <!-- Drag Handle -->
+              <div class="drag-handle" title="Drag to reorder">
+                <svg width="14" height="20" viewBox="0 0 14 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="4" cy="4" r="1.8" fill="currentColor"/>
+                  <circle cx="10" cy="4" r="1.8" fill="currentColor"/>
+                  <circle cx="4" cy="10" r="1.8" fill="currentColor"/>
+                  <circle cx="10" cy="10" r="1.8" fill="currentColor"/>
+                  <circle cx="4" cy="16" r="1.8" fill="currentColor"/>
+                  <circle cx="10" cy="16" r="1.8" fill="currentColor"/>
+                </svg>
               </div>
 
-              <!-- Standard Field Info (editable name & custom field description) -->
-              <div *ngIf="!row.isCustom" class="field-info">
-                <input
-                  type="text"
-                  class="form-control form-control-sm field-name-input"
-                  [(ngModel)]="row.label"
-                  placeholder="Column Name"
-                />
-                <p class="text-xs text-muted">{{ row.description }}</p>
-              </div>
-
-              <!-- Custom Field Editor Info -->
-              <div *ngIf="row.isCustom" class="field-info custom-label-input">
+              <!-- Column Name + description -->
+              <div class="map-col-name">
                 <div class="flex items-center gap-2">
-                  <span class="badge badge-secondary text-xs">Custom</span>
+                  <span *ngIf="row.isCustom" class="badge badge-secondary badge-xs">Custom</span>
                   <input
                     type="text"
-                    class="form-control form-control-sm field-name-input"
+                    class="form-control form-control-sm col-name-input"
                     [(ngModel)]="row.label"
-                    placeholder="Field name (e.g. ID, VIP Level, T-Shirt)"
+                    [placeholder]="row.isCustom ? 'Field name (e.g. ID Number)' : 'Column Name'"
                   />
                 </div>
-                <p class="text-xs text-muted">Custom question / attendee attribute</p>
+                <p class="col-desc">{{ row.isCustom ? 'Custom attendee attribute' : row.description }}</p>
               </div>
 
-              <!-- Header Select -->
-              <div class="mapping-select-group">
-                <select class="form-control" [(ngModel)]="row.selectedHeader">
-                  <option value="">-- Leave Unmapped --</option>
+              <!-- Spreadsheet Header Select -->
+              <div class="map-col-select">
+                <select class="form-control form-control-sm" [(ngModel)]="row.selectedHeader">
+                  <option value="">— Leave Unmapped —</option>
                   <option *ngFor="let h of sheetHeaders" [value]="h">{{ h }}</option>
                 </select>
               </div>
 
-              <!-- Delete / Remove Column Button -->
-              <div class="mapping-action">
+              <!-- Required / Optional toggle -->
+              <div class="map-col-required">
+                <label class="req-toggle">
+                  <input type="checkbox" [(ngModel)]="row.required" />
+                  <span class="req-label" [class.is-required]="row.required">
+                    {{ row.required ? 'Required' : 'Optional' }}
+                  </span>
+                </label>
+              </div>
+
+              <!-- Delete button -->
+              <div class="map-col-delete">
                 <button
                   type="button"
                   (click)="removeMappingRow(row.key)"
-                  class="btn btn-coral btn-xs"
-                  title="Delete/Remove column from mapping"
-                >✕</button>
+                  class="delete-row-btn"
+                  title="Remove this column"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L13 13M13 1L1 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </button>
               </div>
+            </div>
+
+            <!-- Empty state -->
+            <div *ngIf="mappingRows.length === 0" class="mapping-empty-state">
+              No columns configured. Click <strong>+ Add Custom Column Mapping</strong> to begin.
             </div>
           </div>
 
@@ -283,7 +303,10 @@ import * as XLSX from 'xlsx';
                     <option value="import-anyway">Import Anyway</option>
                   </select>
                   <span *ngIf="!row.isDuplicate && row.isValid" class="text-xs text-emerald font-bold">Ready</span>
-                  <span *ngIf="!row.isValid" class="text-xs text-coral">Skipped (errors)</span>
+                  <select *ngIf="!row.isValid" class="form-control text-xs" [(ngModel)]="row.invalidResolution">
+                    <option value="remove">Remove (skip)</option>
+                    <option value="keep-anyway">Keep Anyway</option>
+                  </select>
                 </td>
               </tr>
             </tbody>
@@ -410,67 +433,200 @@ import * as XLSX from 'xlsx';
       font-weight: 800;
       color: var(--flat-dark);
     }
-    .mapping-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
-    }
-    .mapping-row {
-      display: grid;
-      grid-template-columns: auto 1.2fr 1fr auto;
-      gap: 1rem;
-      align-items: center;
-      padding: 0.75rem 1rem;
-      background: var(--flat-gray-50);
-      border: 1px solid var(--flat-border);
-      border-radius: var(--radius-md);
-      transition: background 0.15s ease;
-    }
-    .mapping-row.custom-field-row {
-      background: #fdfaf0;
-      border-color: #fde68a;
-    }
-    .reorder-controls {
+    /* ── Mapping List ──────────────────────────────── */
+    .mapping-list {
       display: flex;
       flex-direction: column;
-      gap: 2px;
-    }
-    .btn-icon-tiny {
-      padding: 2px 5px;
-      font-size: 0.65rem;
-      line-height: 1;
-      background: var(--flat-white);
+      gap: 0;
       border: 1px solid var(--flat-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .mapping-list-header {
+      display: grid;
+      grid-template-columns: 32px 1fr 1fr 72px 36px;
+      gap: 0.75rem;
+      align-items: center;
+      padding: 0.45rem 0.75rem;
+      background: var(--flat-gray-100, #f3f4f6);
+      border-bottom: 1px solid var(--flat-border);
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: var(--flat-gray-500, #6b7280);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .header-required {
+      text-align: center;
+    }
+    .mapping-row-card {
+      display: grid;
+      grid-template-columns: 32px 1fr 1fr 72px 36px;
+      gap: 0.75rem;
+      align-items: center;
+      padding: 0.6rem 0.75rem;
+      background: var(--flat-white);
+      border-bottom: 1px solid var(--flat-border);
+      transition: background 0.12s ease, box-shadow 0.12s ease;
+      cursor: default;
+    }
+    .mapping-row-card:last-child {
+      border-bottom: none;
+    }
+    .mapping-row-card:hover {
+      background: var(--flat-gray-50);
+    }
+    .mapping-row-card.custom-row {
+      background: #fefdf5;
+    }
+    .mapping-row-card.custom-row:hover {
+      background: #fdf9e3;
+    }
+    .mapping-row-card.drag-over {
+      background: var(--flat-primary-light, #eff6ff);
+      box-shadow: 0 -2px 0 0 var(--flat-primary) inset;
+    }
+    .mapping-row-card.dragging {
+      opacity: 0.45;
+    }
+    /* Drag handle */
+    .drag-handle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      color: var(--flat-gray-400, #9ca3af);
+      cursor: grab;
       border-radius: var(--radius-sm);
-      cursor: pointer;
-      color: var(--flat-gray-700);
-      transition: all 0.15s;
+      flex-shrink: 0;
+      transition: color 0.15s;
     }
-    .btn-icon-tiny:hover:not(:disabled) {
-      background: var(--flat-primary);
-      color: var(--flat-white);
-      border-color: var(--flat-primary);
+    .drag-handle:hover {
+      color: var(--flat-primary);
     }
-    .btn-icon-tiny:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
+    .drag-handle:active {
+      cursor: grabbing;
     }
-    .field-name-input {
+    /* Column name cell */
+    .map-col-name {
+      min-width: 0;
+    }
+    .col-name-input {
+      width: 100%;
       font-weight: 700;
-      color: var(--flat-dark);
-      padding: 0.35rem 0.5rem;
-      font-size: 0.875rem;
+      font-size: 0.8rem;
+      padding: 0.3rem 0.45rem;
       border: 1px solid var(--flat-border);
       border-radius: var(--radius-sm);
-      margin-bottom: 0.2rem;
+      background: var(--flat-white);
+      color: var(--flat-dark);
+      margin-bottom: 2px;
     }
-    .field-name-input:focus {
+    .col-name-input:focus {
       border-color: var(--flat-primary);
+      outline: none;
       background: var(--flat-white);
     }
-    .custom-label-input input {
-      padding: 0.35rem 0.5rem;
+    .col-desc {
+      font-size: 0.7rem;
+      color: var(--flat-gray-400, #9ca3af);
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .badge-xs {
+      font-size: 0.6rem;
+      padding: 0.1rem 0.35rem;
+      flex-shrink: 0;
+    }
+    /* Required column cell */
+    .map-col-required {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .req-toggle {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .req-toggle input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: #e53e3e;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .req-label {
+      font-size: 0.6rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--flat-gray-400, #9ca3af);
+      white-space: nowrap;
+    }
+    .req-label.is-required {
+      color: #c53030;
+    }
+    /* Select */
+    .map-col-select {
+      min-width: 0;
+    }
+    .map-col-select .form-control {
+      font-size: 0.8rem;
+      padding: 0.3rem 0.45rem;
+    }
+    /* Delete button */
+    .map-col-delete {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .delete-row-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      color: var(--flat-gray-400, #9ca3af);
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .delete-row-btn:hover {
+      background: var(--flat-coral-light, #fff1f0);
+      border-color: var(--flat-coral, #f56565);
+      color: var(--flat-coral-dark, #c53030);
+    }
+    /* Empty state */
+    .mapping-empty-state {
+      padding: 1.5rem;
+      text-align: center;
       font-size: 0.85rem;
+      color: var(--flat-gray-400, #9ca3af);
+      background: var(--flat-gray-50);
+    }
+    @media (max-width: 640px) {
+      .mapping-list-header { display: none; }
+      .mapping-row-card {
+        grid-template-columns: 28px 1fr auto 36px;
+        grid-template-rows: auto auto;
+        row-gap: 0.4rem;
+        padding: 0.65rem 0.5rem;
+      }
+      .drag-handle { grid-column: 1; grid-row: 1 / 3; }
+      .map-col-name { grid-column: 2 / 5; grid-row: 1; }
+      .map-col-select { grid-column: 2 / 4; grid-row: 2; }
+      .map-col-required { grid-column: 3 / 4; grid-row: 2; justify-content: flex-start; }
+      .map-col-delete { grid-column: 4 / 5; grid-row: 2; }
     }
     .btn-xs {
       padding: 0.25rem 0.5rem;
@@ -516,6 +672,10 @@ export class ExcelImportTabComponent implements OnInit {
   validationSummary?: ImportValidationSummary;
   importedCount = 0;
   primaryKeyColumnKey = '';
+
+  // Drag-and-drop reorder state
+  dragSourceIndex = -1;
+  dragOverIndex = -1;
 
   // Reorderable mapping row model
   mappingRows: Array<{
@@ -724,6 +884,53 @@ export class ExcelImportTabComponent implements OnInit {
     }
   }
 
+  // ── Drag-and-drop reorder handlers ────────────────
+  onRowDragStart(e: DragEvent, index: number): void {
+    this.dragSourceIndex = index;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(index));
+    }
+  }
+
+  onRowDragOver(e: DragEvent, index: number): void {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    if (index !== this.dragSourceIndex) {
+      this.dragOverIndex = index;
+    }
+  }
+
+  onRowDragLeave(e: DragEvent): void {
+    // Only clear if leaving the list entirely (not entering a child)
+    const target = e.currentTarget as HTMLElement;
+    const related = e.relatedTarget as Node | null;
+    if (!related || !target.contains(related)) {
+      this.dragOverIndex = -1;
+    }
+  }
+
+  onRowDrop(e: DragEvent, dropIndex: number): void {
+    e.preventDefault();
+    const from = this.dragSourceIndex;
+    if (from === -1 || from === dropIndex) {
+      this.dragOverIndex = -1;
+      return;
+    }
+    // Reinsert the dragged item at the drop position
+    const rows = [...this.mappingRows];
+    const [moved] = rows.splice(from, 1);
+    rows.splice(dropIndex, 0, moved);
+    this.mappingRows = rows;
+    this.dragSourceIndex = -1;
+    this.dragOverIndex = -1;
+  }
+
+  onRowDragEnd(): void {
+    this.dragSourceIndex = -1;
+    this.dragOverIndex = -1;
+  }
+
   syncColumnMappingFromRows(): void {
     // Reset standard fields in columnMapping first
     this.columnMapping.firstName = '';
@@ -751,6 +958,9 @@ export class ExcelImportTabComponent implements OnInit {
     }
     this.columnMapping.customColumns = customCols;
     this.columnMapping.primaryKeyColumn = this.primaryKeyColumnKey;
+    this.columnMapping.requiredColumns = this.mappingRows
+      .filter(r => r.required && r.selectedHeader)
+      .map(r => r.key);
   }
 
   proceedToPreview(isAutomated = false): void {
@@ -858,17 +1068,65 @@ export class ExcelImportTabComponent implements OnInit {
   getImportableCount(): number {
     if (!this.validationSummary) return 0;
     return this.validationSummary.rows.filter(r => {
-      if (!r.isValid) return false;
+      if (!r.isValid && r.invalidResolution !== 'keep-anyway') return false;
       if (r.isDuplicate && r.duplicateResolution === 'skip') return false;
       return true;
     }).length;
+  }
+
+  hasInvalidRows(): boolean {
+    return !!this.validationSummary && this.validationSummary.invalidRows > 0;
+  }
+
+  getTotalImportableCount(): number {
+    if (!this.validationSummary) return 0;
+    return this.validationSummary.rows.filter(r => {
+      if (r.isDuplicate && r.duplicateResolution === 'skip') return false;
+      return true;
+    }).length;
+  }
+
+  confirmImportAll(): void {
+    if (!this.event || !this.validationSummary) return;
+
+    const importable = this.validationSummary.rows.filter(r => {
+      if (r.isDuplicate && r.duplicateResolution === 'skip') return false;
+      return true;
+    });
+
+    if (importable.length === 0) {
+      this.toastService.warning('No Records', 'No rows selected for import.');
+      return;
+    }
+
+    this.isImporting = true;
+
+    setTimeout(() => {
+      const attendeesToCreate = importable.map(r => ({
+        firstName: r.firstName,
+        lastName: r.lastName,
+        email: r.email,
+        phone: r.phone,
+        company: r.company,
+        jobTitle: r.jobTitle,
+        dietaryPreferences: r.dietaryPreferences,
+        rsvpStatus: r.rsvpStatus || 'pending',
+        customAnswers: r.customAnswers || []
+      }));
+
+      const created = this.registrationService.importBatchAttendees(this.event!.id, attendeesToCreate);
+      this.importedCount = created.length;
+      this.isImporting = false;
+      this.step = 4;
+      this.toastService.success('Import Successful', `Imported ${created.length} attendees with QR passes (including invalid rows).`);
+    }, 400);
   }
 
   confirmImport(): void {
     if (!this.event || !this.validationSummary) return;
 
     const importable = this.validationSummary.rows.filter(r => {
-      if (!r.isValid) return false;
+      if (!r.isValid && r.invalidResolution !== 'keep-anyway') return false;
       if (r.isDuplicate && r.duplicateResolution === 'skip') return false;
       return true;
     });

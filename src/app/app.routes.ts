@@ -31,6 +31,10 @@ export const routes: Routes = [
     path: 'event/:eventId/confirmation/:regId',
     loadComponent: () => import('./features/public/rsvp-confirmation.component').then(m => m.RsvpConfirmationComponent)
   },
+  {
+    path: 'event/:eventId/confirm',
+    loadComponent: () => import('./features/public/attendance-confirmation.component').then(m => m.AttendanceConfirmationComponent)
+  },
 
   // Organizer Protected Routes
   {

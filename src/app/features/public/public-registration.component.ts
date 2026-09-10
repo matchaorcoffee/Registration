@@ -13,6 +13,16 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, StatusBadgeComponent],
   template: `
+    <!-- Event not found state -->
+    <div class="public-reg-wrapper" *ngIf="!event && eventLoadAttempted">
+      <div class="container container-narrow" style="padding:4rem 1.25rem;text-align:center;">
+        <div style="font-size:3rem;margin-bottom:1rem;">🔍</div>
+        <h2 style="font-size:1.5rem;font-weight:800;color:var(--flat-dark);">Event Not Found</h2>
+        <p class="text-muted text-sm" style="margin-top:0.5rem;">The event you are looking for does not exist or may have been removed.</p>
+        <a routerLink="/" class="btn btn-primary" style="margin-top:1.5rem;display:inline-block;">← Back to Home</a>
+      </div>
+    </div>
+
     <div class="public-reg-wrapper" *ngIf="event">
       <div class="container container-narrow">
         <!-- Event Top Header Banner -->
@@ -72,7 +82,8 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
         <div class="form-card" *ngIf="isRegistrationOpen">
           <div class="form-header">
             <h2 class="form-title">Guest RSVP & Registration</h2>
-            <p class="text-muted text-sm">Please complete your details to generate your official QR Pass.</p>
+            <p class="text-muted text-sm" *ngIf="event!.isQrEnabled !== false">Please complete your details to generate your official QR Pass.</p>
+            <p class="text-muted text-sm" *ngIf="event!.isQrEnabled === false">Please complete your details to confirm your registration.</p>
           </div>
 
           <form [formGroup]="regForm" (ngSubmit)="onSubmit()">
@@ -361,7 +372,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
                 <strong>You're already registered!</strong>
                 <p>Our records show that <strong>{{ alreadyRegisteredInfo.firstName }} {{ alreadyRegisteredInfo.lastName }}</strong> is already registered for this event.</p>
                 <a [routerLink]="['/event', event!.id, 'confirmation', alreadyRegisteredInfo.id]" class="btn btn-primary btn-sm mt-2">
-                  View Your QR Pass →
+                  {{ event!.isQrEnabled !== false ? 'View Your QR Pass →' : 'View Registration →' }}
                 </a>
               </div>
             </div>
@@ -373,10 +384,11 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
                 [disabled]="regForm.invalid || isSubmitting || !!alreadyRegisteredInfo"
                 class="btn btn-primary btn-block btn-lg"
               >
-                <span *ngIf="!isSubmitting">Complete Registration & Get QR Pass →</span>
-                <span *ngIf="isSubmitting">Processing Pass...</span>
+                <span *ngIf="!isSubmitting && event!.isQrEnabled !== false">Complete Registration & Get QR Pass →</span>
+                <span *ngIf="!isSubmitting && event!.isQrEnabled === false">Complete Registration →</span>
+                <span *ngIf="isSubmitting">Processing...</span>
               </button>
-              <p class="text-xs text-center text-muted mt-2">
+              <p class="text-xs text-center text-muted mt-2" *ngIf="event!.isQrEnabled !== false">
                 🔒 Your unique QR token is generated locally. No sensitive personal data is encoded in the QR.
               </p>
             </div>
@@ -622,6 +634,7 @@ export class PublicRegistrationComponent implements OnInit {
   hasEventSpecificConfig = false;
   isSubmitting = false;
   alreadyRegisteredInfo: Registration | null = null;
+  eventLoadAttempted = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -637,6 +650,8 @@ export class PublicRegistrationComponent implements OnInit {
     if (eventId) {
       this.loadEvent(eventId);
       this.loadEventFieldConfiguration(eventId);
+    } else {
+      this.eventLoadAttempted = true;
     }
     this.initForm();
     this.regForm.valueChanges.subscribe(() => {
@@ -646,9 +661,10 @@ export class PublicRegistrationComponent implements OnInit {
 
   private loadEvent(id: string): void {
     this.event = this.eventService.getEventById(id);
+    this.eventLoadAttempted = true;
     if (!this.event) {
-      this.toastService.error('Event Not Found', 'The requested event is not available.');
-      this.router.navigate(['/']);
+      this.toastService.error('Event Not Found', 'The requested event could not be found.');
+      // Do not redirect — show inline error state instead
       return;
     }
     this.customQuestions = this.eventService.getCustomQuestionsForEvent(id);
@@ -898,7 +914,8 @@ export class PublicRegistrationComponent implements OnInit {
     });
 
     this.isSubmitting = false;
-    this.toastService.success('Registration Confirmed!', 'Your QR Pass is ready.');
+    const qrMsg = this.event.isQrEnabled !== false ? 'Your QR Pass is ready.' : 'You are now registered for this event.';
+    this.toastService.success('Registration Confirmed!', qrMsg);
     this.router.navigate(['/event', this.event.id, 'confirmation', reg.id]);
   }
 }

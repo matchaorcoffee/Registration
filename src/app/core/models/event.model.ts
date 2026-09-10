@@ -35,6 +35,8 @@ export interface Event {
   endTime: string; // HH:mm
   venue: string;
   address: string;
+  latitude?: number;
+  longitude?: number;
   registrationDeadline: string; // YYYY-MM-DD
   capacity: number;
   organizerId: string;
@@ -44,6 +46,7 @@ export interface Event {
   status: EventStatus;
   isWalkInAllowed: boolean;
   isRsvpEnabled: boolean;
+  isQrEnabled?: boolean;
   confirmationMessage?: string;
   customQuestions?: CustomQuestion[];
   createdAt: string;
@@ -120,6 +123,7 @@ export interface ExcelAttendeeRow {
   errors?: string[];
   isDuplicate?: boolean;
   duplicateResolution?: 'skip' | 'update' | 'import-anyway';
+  invalidResolution?: 'remove' | 'keep-anyway';
 }
 
 export interface CustomMappedColumn {
@@ -140,4 +144,5 @@ export interface ColumnMapping {
   dietary: string;
   primaryKeyColumn?: string; // key of the column used as primary key / unique ID
   customColumns?: CustomMappedColumn[];
+  requiredColumns?: string[]; // keys of columns the organizer marked as required
 }

@@ -37,7 +37,7 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
             <button (click)="cleanDuplicates()" class="btn btn-coral btn-sm" title="Find and purge redundant duplicate entries by ID, email, or name">
               🧹 Clean Duplicates
             </button>
-            <a [routerLink]="['/event', event.id, 'rsvp']" target="_blank" class="btn btn-primary btn-sm">
+            <a [routerLink]="['/event', event.id, 'register']" target="_blank" class="btn btn-primary btn-sm">
               🔗 Open Guest RSVP Portal
             </a>
             <button (click)="exportExcel()" class="btn btn-emerald btn-sm">
@@ -226,7 +226,7 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
                   <!-- Initial question buttons -->
                   <div class="empty-prompt-actions" *ngIf="emptyAction === 'idle'">
                     <a
-                      [routerLink]="['/event', event!.id, 'rsvp']"
+                      [routerLink]="['/event', event!.id, 'register']"
                       target="_blank"
                       class="btn btn-primary"
                       (click)="emptyAction = 'walkin'"

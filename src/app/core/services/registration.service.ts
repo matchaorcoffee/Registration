@@ -51,7 +51,7 @@ export class RegistrationService {
       const matchId = r.id.toLowerCase() === q;
       const matchEmail = r.email.toLowerCase() === q;
       const matchName = `${r.firstName} ${r.lastName}`.toLowerCase().includes(q);
-      const matchToken = r.qrToken.toLowerCase() === q;
+      const matchToken = r.qrToken ? r.qrToken.toLowerCase() === q : false;
       return matchEvent && (matchId || matchEmail || matchName || matchToken);
     });
   }
@@ -77,11 +77,13 @@ export class RegistrationService {
     customAnswers?: any[];
   }): Registration {
     const regs = this.getRegistrations();
+    const event = this.storageService.getEvents().find(e => e.id === data.eventId);
+    const qrEnabled = event?.isQrEnabled !== false;
     const eventRegs = regs.filter(r => r.eventId === data.eventId);
     const seq = (eventRegs.length + 1).toString().padStart(6, '0');
     const year = new Date().getFullYear();
     const regId = `EVT-${year}-${seq}`;
-    const token = this.qrCodeService.generateSecureToken(data.eventId, regId);
+    const token = qrEnabled ? this.qrCodeService.generateSecureToken(data.eventId, regId) : '';
 
     const newReg: Registration = {
       id: regId,
@@ -124,11 +126,13 @@ export class RegistrationService {
     customAnswers?: any[];
   }): Registration {
     const regs = this.getRegistrations();
+    const event = this.storageService.getEvents().find(e => e.id === data.eventId);
+    const qrEnabled = event?.isQrEnabled !== false;
     const walkInCount = regs.filter(r => r.eventId === data.eventId && r.registrationType === 'walk-in').length + 1;
     const seq = walkInCount.toString().padStart(5, '0');
     const year = new Date().getFullYear();
     const regId = `EVT-${year}-W-${seq}`;
-    const token = this.qrCodeService.generateSecureToken(data.eventId, regId);
+    const token = qrEnabled ? this.qrCodeService.generateSecureToken(data.eventId, regId) : '';
     const nowIso = new Date().toISOString();
 
     const newReg: Registration = {
@@ -168,11 +172,14 @@ export class RegistrationService {
     let currentTotal = regs.filter(r => r.eventId === eventId).length;
     const year = new Date().getFullYear();
 
+    const event = this.storageService.getEvents().find(e => e.id === eventId);
+    const qrEnabled = event?.isQrEnabled !== false;
+
     for (const item of attendees) {
       currentTotal++;
       const seq = currentTotal.toString().padStart(6, '0');
       const regId = `EVT-${year}-${seq}`;
-      const token = this.qrCodeService.generateSecureToken(eventId, regId);
+      const token = qrEnabled ? this.qrCodeService.generateSecureToken(eventId, regId) : '';
 
       const newReg: Registration = {
         ...item,

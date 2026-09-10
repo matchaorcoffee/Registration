@@ -74,8 +74,8 @@ import { RsvpBadgeComponent } from '../../shared/components/rsvp-badge/rsvp-badg
 
           </div>
 
-          <!-- Ticket Right / QR Side (Hidden if declined) -->
-          <div class="ticket-right" *ngIf="registration.rsvpStatus !== 'declined'">
+          <!-- Ticket Right / QR Side (shown when not declined AND QR is enabled) -->
+          <div class="ticket-right" *ngIf="registration.rsvpStatus !== 'declined' && event.isQrEnabled !== false">
             <div class="qr-heading">Scan at Event Check-In</div>
             
             <app-qr-display
@@ -87,6 +87,15 @@ import { RsvpBadgeComponent } from '../../shared/components/rsvp-badge/rsvp-badg
 
             <p class="qr-footnote text-xs text-muted mt-3">
               Present this digital pass or save it to your phone album. Staff will scan it at entry.
+            </p>
+          </div>
+
+          <!-- No QR Pass — organizer disabled QR -->
+          <div class="ticket-right ticket-declined-side" *ngIf="registration.rsvpStatus !== 'declined' && event.isQrEnabled === false">
+            <div class="declined-icon">🎟️</div>
+            <h3 class="font-extrabold text-lg mt-2" style="color:#1f2328;">Registration Confirmed</h3>
+            <p class="text-xs text-muted mt-2 max-w-xs">
+              This event uses <strong>manual check-in</strong>. No QR pass is required — staff will locate your name on the guest list.
             </p>
           </div>
 
