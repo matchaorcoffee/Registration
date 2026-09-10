@@ -19,7 +19,11 @@ import { RsvpBadgeComponent } from '../../shared/components/rsvp-badge/rsvp-badg
         
         <!-- Hero Header -->
         <div class="event-hero-card">
-          <div class="event-banner-img" [style.backgroundImage]="'url(' + event.bannerUrl + ')'" [style.backgroundPosition]="event.bannerPosition || 'center'">
+          <div class="event-banner-img">
+            <img class="banner-img-layer"
+              [src]="event.bannerUrl"
+              [style.transform]="'translate(' + (event.bannerOffsetX ?? 0) + 'px, ' + (event.bannerOffsetY ?? 0) + 'px) scale(' + (event.bannerZoom ?? 1) + ')'"
+              alt="" aria-hidden="true" />
             <div class="banner-top-badge">
               <app-status-badge [status]="event.status"></app-status-badge>
               <span class="category-pill">{{ event.category | uppercase }}</span>
@@ -221,10 +225,23 @@ import { RsvpBadgeComponent } from '../../shared/components/rsvp-badge/rsvp-badg
     }
     .event-banner-img {
       height: 180px;
-      background-size: cover;
-      background-position: center;
       position: relative;
+      overflow: hidden;
       padding: 1rem;
+    }
+    .banner-img-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      transform-origin: center center;
+      z-index: 0;
+    }
+    .banner-top-badge {
+      position: relative;
+      z-index: 1;
     }
     .banner-top-badge {
       display: flex;

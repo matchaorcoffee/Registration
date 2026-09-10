@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
@@ -100,31 +100,47 @@ import { AuthService } from '../../core/services/auth.service';
                 </div>
               </div>
 
-              <!-- Banner Preview + Focal-Point Picker -->
-              <div *ngIf="eventForm.get('bannerUrl')?.value" class="banner-preview-wrap mt-3">
+              <!-- Banner Image Editor -->
+              <div *ngIf="eventForm.get('bannerUrl')?.value" class="banner-editor-wrap mt-3">
+
+                <!-- Drag canvas -->
                 <div
-                  class="banner-preview-img"
-                  [style.backgroundImage]="'url(' + eventForm.get('bannerUrl')?.value + ')'"
-                  [style.backgroundPosition]="eventForm.get('bannerPosition')?.value || 'center'"
+                  #bannerCanvas
+                  class="banner-canvas"
+                  [class.dragging]="isDragging"
+                  (mousedown)="onDragStart($event)"
+                  (wheel)="onWheel($event)"
+                  (touchstart)="onTouchStart($event)"
+                  (touchmove)="onTouchMove($event)"
+                  (touchend)="onTouchEnd()"
                 >
-                  <span class="preview-badge">Banner Preview</span>
+                  <img
+                    [src]="eventForm.get('bannerUrl')?.value"
+                    class="banner-canvas-img"
+                    [style.transform]="bannerTransform"
+                    draggable="false"
+                    alt="Banner preview"
+                  />
+                  <!-- overlay labels -->
+                  <span class="preview-badge">Banner Preview · Drag to reposition</span>
                   <button type="button" (click)="clearBanner()" class="btn-clear-banner" title="Remove Banner">✕</button>
                 </div>
 
-                <!-- Focal-point picker -->
-                <div class="focal-picker-row">
-                  <span class="focal-label">Image position:</span>
-                  <div class="focal-grid">
-                    <button
-                      *ngFor="let p of bannerPositions"
-                      type="button"
-                      class="focal-dot"
-                      [class.active]="eventForm.get('bannerPosition')?.value === p.value"
-                      [title]="p.label"
-                      (click)="eventForm.get('bannerPosition')?.setValue(p.value)"
-                    ></button>
+                <!-- Controls toolbar -->
+                <div class="banner-toolbar">
+                  <div class="toolbar-group">
+                    <button type="button" class="toolbar-btn" (click)="zoomOut()" title="Zoom out">−</button>
+                    <input
+                      type="range"
+                      class="zoom-slider"
+                      [min]="ZOOM_MIN" [max]="ZOOM_MAX" [step]="0.05"
+                      [value]="bannerZoom"
+                      (input)="onZoomSlider($any($event))"
+                    />
+                    <button type="button" class="toolbar-btn" (click)="zoomIn()" title="Zoom in">+</button>
+                    <span class="zoom-label">{{ (bannerZoom * 100) | number:'1.0-0' }}%</span>
                   </div>
-                  <span class="focal-hint">{{ getFocalLabel() }}</span>
+                  <button type="button" class="toolbar-btn toolbar-btn-reset" (click)="resetBanner()" title="Reset position & zoom">↺ Reset</button>
                 </div>
               </div>
             </div>
@@ -323,76 +339,98 @@ import { AuthService } from '../../core/services/auth.service';
       border-radius: var(--radius-md);
       padding: 1rem;
     }
-    .banner-preview-wrap {
+    .banner-editor-wrap {
       border-radius: var(--radius-md);
       overflow: hidden;
       border: 1.5px solid var(--flat-border);
     }
-    .banner-preview-img {
-      height: 120px;
-      background-size: cover;
-      background-position: center;
+    .banner-canvas {
       position: relative;
-      padding: 0.5rem 0.75rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      transition: background-position 0.25s ease;
-    }
-    .focal-picker-row {
+      height: 160px;
+      overflow: hidden;
+      cursor: grab;
+      background: #111;
       display: flex;
       align-items: center;
-      gap: 0.6rem;
-      padding: 0.45rem 0.75rem;
+      justify-content: center;
+      user-select: none;
+    }
+    .banner-canvas.dragging {
+      cursor: grabbing;
+    }
+    .banner-canvas-img {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      transform-origin: center center;
+      will-change: transform;
+    }
+    .banner-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.4rem 0.75rem;
       background: var(--flat-gray-50);
       border-top: 1px solid var(--flat-border);
     }
-    .focal-label {
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .toolbar-btn {
+      background: var(--flat-white);
+      border: 1.5px solid var(--flat-border);
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      cursor: pointer;
+      line-height: 1.4;
+      color: var(--flat-dark);
+    }
+    .toolbar-btn:hover {
+      background: var(--flat-gray-100);
+    }
+    .toolbar-btn-reset {
+      color: var(--flat-primary);
+      border-color: var(--flat-primary);
+    }
+    .zoom-slider {
+      width: 90px;
+      accent-color: var(--flat-primary);
+      cursor: pointer;
+    }
+    .zoom-label {
       font-size: 0.7rem;
       font-weight: 700;
       color: var(--flat-gray-600);
-      white-space: nowrap;
-    }
-    .focal-hint {
-      font-size: 0.68rem;
-      color: var(--flat-gray-500);
-      white-space: nowrap;
-    }
-    .focal-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 14px);
-      grid-template-rows: repeat(3, 14px);
-      gap: 3px;
-    }
-    .focal-dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 1.5px solid var(--flat-gray-400);
-      background: var(--flat-white);
-      cursor: pointer;
-      padding: 0;
-      transition: background 0.15s, border-color 0.15s;
-    }
-    .focal-dot:hover {
-      border-color: var(--flat-primary);
-      background: var(--flat-primary-light);
-    }
-    .focal-dot.active {
-      background: var(--flat-primary);
-      border-color: var(--flat-primary);
+      min-width: 36px;
+      text-align: right;
     }
     .preview-badge {
-      background: rgba(15, 23, 42, 0.85);
+      position: absolute;
+      top: 0.5rem;
+      left: 0.6rem;
+      background: rgba(15, 23, 42, 0.82);
       color: var(--flat-white);
-      font-size: 0.65rem;
+      font-size: 0.6rem;
       font-weight: 800;
       padding: 0.2rem 0.5rem;
       border-radius: var(--radius-sm);
       letter-spacing: 0.05em;
       text-transform: uppercase;
+      pointer-events: none;
+      z-index: 2;
     }
     .btn-clear-banner {
+      position: absolute;
+      top: 0.45rem;
+      right: 0.5rem;
+      z-index: 3;
       background: rgba(239, 68, 68, 0.9);
       color: var(--flat-white);
       border: none;
@@ -449,24 +487,110 @@ export class EventFormComponent implements OnInit {
   currentOrganizerId = 'usr_org_001';
   isOwner = false;
 
-  /** 9-point focal-point grid (row-major: top-left → bottom-right) */
-  readonly bannerPositions = [
-    { value: 'top left',    label: 'Top Left'     },
-    { value: 'top center',  label: 'Top Center'   },
-    { value: 'top right',   label: 'Top Right'    },
-    { value: 'center left', label: 'Middle Left'  },
-    { value: 'center',      label: 'Center'       },
-    { value: 'center right',label: 'Middle Right' },
-    { value: 'bottom left', label: 'Bottom Left'  },
-    { value: 'bottom center',label:'Bottom Center'},
-    { value: 'bottom right',label: 'Bottom Right' },
-  ];
+  // ── Banner editor state ──────────────────────────────────────────────────
+  readonly ZOOM_MIN = 1;
+  readonly ZOOM_MAX = 3;
+  readonly ZOOM_STEP = 0.1;
 
-  getFocalLabel(): string {
-    const val = this.eventForm?.get('bannerPosition')?.value || 'center';
-    return this.bannerPositions.find(p => p.value === val)?.label ?? val;
+  bannerOffsetX = 0;   // px offset, translated to % on save
+  bannerOffsetY = 0;
+  bannerZoom    = 1;
+
+  // drag tracking
+  isDragging      = false;
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private dragOriginX = 0;
+  private dragOriginY = 0;
+
+  // pinch-to-zoom tracking
+  private lastPinchDist = 0;
+  private lastPinchZoom = 1;
+
+  get bannerTransform(): string {
+    return `translate(${this.bannerOffsetX}px, ${this.bannerOffsetY}px) scale(${this.bannerZoom})`;
   }
 
+  // ── Mouse drag ────────────────────────────────────────────────────────────
+  onDragStart(e: MouseEvent): void {
+    if ((e.target as HTMLElement).closest('.btn-clear-banner')) return;
+    e.preventDefault();
+    this.isDragging  = true;
+    this.dragStartX  = e.clientX;
+    this.dragStartY  = e.clientY;
+    this.dragOriginX = this.bannerOffsetX;
+    this.dragOriginY = this.bannerOffsetY;
+  }
+
+  @HostListener('document:mousemove', ['$event'])
+  onMouseMove(e: MouseEvent): void {
+    if (!this.isDragging) return;
+    this.bannerOffsetX = this.dragOriginX + (e.clientX - this.dragStartX);
+    this.bannerOffsetY = this.dragOriginY + (e.clientY - this.dragStartY);
+  }
+
+  @HostListener('document:mouseup')
+  onMouseUp(): void {
+    this.isDragging = false;
+  }
+
+  // ── Wheel zoom ────────────────────────────────────────────────────────────
+  onWheel(e: WheelEvent): void {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -this.ZOOM_STEP : this.ZOOM_STEP;
+    this.bannerZoom = Math.min(this.ZOOM_MAX, Math.max(this.ZOOM_MIN, +(this.bannerZoom + delta).toFixed(2)));
+  }
+
+  // ── Touch drag + pinch ────────────────────────────────────────────────────
+  onTouchStart(e: TouchEvent): void {
+    if (e.touches.length === 1) {
+      this.isDragging  = true;
+      this.dragStartX  = e.touches[0].clientX;
+      this.dragStartY  = e.touches[0].clientY;
+      this.dragOriginX = this.bannerOffsetX;
+      this.dragOriginY = this.bannerOffsetY;
+    } else if (e.touches.length === 2) {
+      this.isDragging     = false;
+      this.lastPinchDist  = this.pinchDist(e);
+      this.lastPinchZoom  = this.bannerZoom;
+    }
+  }
+
+  onTouchMove(e: TouchEvent): void {
+    e.preventDefault();
+    if (e.touches.length === 1 && this.isDragging) {
+      this.bannerOffsetX = this.dragOriginX + (e.touches[0].clientX - this.dragStartX);
+      this.bannerOffsetY = this.dragOriginY + (e.touches[0].clientY - this.dragStartY);
+    } else if (e.touches.length === 2) {
+      const dist  = this.pinchDist(e);
+      const ratio = dist / this.lastPinchDist;
+      this.bannerZoom = Math.min(this.ZOOM_MAX, Math.max(this.ZOOM_MIN, +(this.lastPinchZoom * ratio).toFixed(2)));
+    }
+  }
+
+  onTouchEnd(): void { this.isDragging = false; }
+
+  private pinchDist(e: TouchEvent): number {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // ── Toolbar actions ───────────────────────────────────────────────────────
+  zoomIn():  void { this.bannerZoom = Math.min(this.ZOOM_MAX, +(this.bannerZoom + this.ZOOM_STEP).toFixed(2)); }
+  zoomOut(): void { this.bannerZoom = Math.max(this.ZOOM_MIN, +(this.bannerZoom - this.ZOOM_STEP).toFixed(2)); }
+
+  onZoomSlider(e: InputEvent): void {
+    this.bannerZoom = +parseFloat((e.target as HTMLInputElement).value).toFixed(2);
+  }
+
+  resetBanner(): void {
+    this.bannerOffsetX = 0;
+    this.bannerOffsetY = 0;
+    this.bannerZoom    = 1;
+  }
+
+  // ── Constructor / lifecycle ───────────────────────────────────────────────
   constructor(
     private fb: FormBuilder,
     private eventService: EventService,
@@ -488,32 +612,29 @@ export class EventFormComponent implements OnInit {
 
   private initForm(): void {
     const today = new Date();
-    const defaultDate = new Date(today.getTime() + 14 * 86400000).toISOString().split('T')[0];
+    const defaultDate     = new Date(today.getTime() + 14 * 86400000).toISOString().split('T')[0];
     const defaultDeadline = new Date(today.getTime() + 10 * 86400000).toISOString().split('T')[0];
     const currentUser = this.authService.currentUserValue;
-    if (currentUser) {
-      this.currentOrganizerId = currentUser.id;
-    }
+    if (currentUser) { this.currentOrganizerId = currentUser.id; }
 
     this.eventForm = this.fb.group({
-      name: ['', [Validators.required, Validators.minLength(3)]],
-      tagline: [''],
-      category: ['conference', Validators.required],
-      bannerUrl: ['https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=80'],
-      bannerPosition: ['center'],
-      description: ['', [Validators.required, Validators.minLength(10)]],
-      date: [defaultDate, Validators.required],
-      startTime: ['09:00', Validators.required],
-      endTime: ['17:00', Validators.required],
-      venue: ['', Validators.required],
-      address: ['', Validators.required],
+      name:                 ['', [Validators.required, Validators.minLength(3)]],
+      tagline:              [''],
+      category:             ['conference', Validators.required],
+      bannerUrl:            ['https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=80'],
+      description:          ['', [Validators.required, Validators.minLength(10)]],
+      date:                 [defaultDate, Validators.required],
+      startTime:            ['09:00', Validators.required],
+      endTime:              ['17:00', Validators.required],
+      venue:                ['', Validators.required],
+      address:              ['', Validators.required],
       registrationDeadline: [defaultDeadline, Validators.required],
-      capacity: [200, [Validators.required, Validators.min(1)]],
-      organizerName: [currentUser?.name || 'Alex Rivera', Validators.required],
-      contactEmail: [currentUser?.email || 'alex.organizer@evently.io', [Validators.required, Validators.email]],
-      contactNumber: ['+1 (555) 234-5678'],
-      isWalkInAllowed: [true],
-      isRsvpEnabled: [true]
+      capacity:             [200, [Validators.required, Validators.min(1)]],
+      organizerName:        [currentUser?.name  || 'Alex Rivera',              Validators.required],
+      contactEmail:         [currentUser?.email || 'alex.organizer@evently.io', [Validators.required, Validators.email]],
+      contactNumber:        ['+1 (555) 234-5678'],
+      isWalkInAllowed:      [true],
+      isRsvpEnabled:        [true]
     });
   }
 
@@ -525,29 +646,32 @@ export class EventFormComponent implements OnInit {
       return;
     }
 
-    // Check ownership — only the organizer who created the event may delete it
     const currentUser = this.authService.currentUserValue;
     this.isOwner = !!currentUser && evt.organizerId === currentUser.id;
 
+    // Restore banner editor state from saved values
+    this.bannerOffsetX = evt.bannerOffsetX ?? 0;
+    this.bannerOffsetY = evt.bannerOffsetY ?? 0;
+    this.bannerZoom    = evt.bannerZoom    ?? 1;
+
     this.eventForm.patchValue({
-      name: evt.name,
-      tagline: evt.tagline || '',
-      category: evt.category,
-      bannerUrl: evt.bannerUrl,
-      bannerPosition: evt.bannerPosition || 'center',
-      description: evt.description,
-      date: evt.date,
-      startTime: evt.startTime,
-      endTime: evt.endTime,
-      venue: evt.venue,
-      address: evt.address,
+      name:                 evt.name,
+      tagline:              evt.tagline || '',
+      category:             evt.category,
+      bannerUrl:            evt.bannerUrl,
+      description:          evt.description,
+      date:                 evt.date,
+      startTime:            evt.startTime,
+      endTime:              evt.endTime,
+      venue:                evt.venue,
+      address:              evt.address,
       registrationDeadline: evt.registrationDeadline,
-      capacity: evt.capacity,
-      organizerName: evt.organizerName,
-      contactEmail: evt.contactEmail,
-      contactNumber: evt.contactNumber,
-      isWalkInAllowed: evt.isWalkInAllowed,
-      isRsvpEnabled: evt.isRsvpEnabled
+      capacity:             evt.capacity,
+      organizerName:        evt.organizerName,
+      contactEmail:         evt.contactEmail,
+      contactNumber:        evt.contactNumber,
+      isWalkInAllowed:      evt.isWalkInAllowed,
+      isRsvpEnabled:        evt.isRsvpEnabled
     });
 
     this.customQuestions = this.eventService.getCustomQuestionsForEvent(id);
@@ -561,28 +685,26 @@ export class EventFormComponent implements OnInit {
   onBannerFileSelected(event: Event | any): void {
     const file = event.target?.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith('image/')) {
       this.toastService.error('Invalid File', 'Please select an image file (PNG, JPG, WebP).');
       return;
     }
-
     if (file.size > 5 * 1024 * 1024) {
       this.toastService.error('File Too Large', 'Banner image should be under 5MB.');
       return;
     }
-
     const reader = new FileReader();
     reader.onload = (e: any) => {
-      const dataUrl = e.target.result as string;
-      this.eventForm.patchValue({ bannerUrl: dataUrl });
-      this.toastService.success('Banner Uploaded', 'Image preview loaded.');
+      this.eventForm.patchValue({ bannerUrl: e.target.result as string });
+      this.resetBanner();
+      this.toastService.success('Banner Uploaded', 'Drag and zoom to adjust the crop.');
     };
     reader.readAsDataURL(file);
   }
 
   clearBanner(): void {
     this.eventForm.patchValue({ bannerUrl: '' });
+    this.resetBanner();
   }
 
   onSubmit(): void {
@@ -595,18 +717,25 @@ export class EventFormComponent implements OnInit {
     this.isSubmitting = true;
     const formVal = this.eventForm.value;
 
+    // Attach banner editor values to the saved event
+    const bannerExtra = {
+      bannerOffsetX: this.bannerOffsetX,
+      bannerOffsetY: this.bannerOffsetY,
+      bannerZoom:    this.bannerZoom
+    };
+
     if (this.isEditMode) {
-      this.eventService.updateEvent(this.eventId, formVal);
+      this.eventService.updateEvent(this.eventId, { ...formVal, ...bannerExtra });
       this.eventService.saveCustomQuestionsForEvent(this.eventId, this.customQuestions);
       this.toastService.success('Event Updated', 'Changes saved successfully.');
       this.router.navigate(['/events', this.eventId]);
     } else {
       const created = this.eventService.createEvent({
         ...formVal,
+        ...bannerExtra,
         organizerId: this.currentOrganizerId,
         badgeColor: '#2563eb'
       }, this.customQuestions);
-
       this.toastService.success('Event Created', `"${created.name}" is now live!`);
       this.router.navigate(['/events', created.id]);
     }

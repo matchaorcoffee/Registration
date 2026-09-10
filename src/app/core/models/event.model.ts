@@ -23,7 +23,9 @@ export interface Event {
   description: string;
   category: 'conference' | 'workshop' | 'celebration' | 'seminar' | 'networking' | 'webinar';
   bannerUrl: string;
-  bannerPosition?: string; // CSS background-position, e.g. 'center', 'top', '50% 20%'
+  bannerOffsetX?: number; // % offset from center: -50..50, default 0
+  bannerOffsetY?: number; // % offset from center: -50..50, default 0
+  bannerZoom?: number;    // scale multiplier: 1.0 = fit, >1 = zoomed in, default 1
   badgeColor?: string;
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm

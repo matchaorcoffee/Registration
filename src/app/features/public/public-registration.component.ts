@@ -17,7 +17,11 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
       <div class="container container-narrow">
         <!-- Event Top Header Banner -->
         <div class="event-hero-card">
-          <div class="event-banner-img" [style.backgroundImage]="'url(' + event.bannerUrl + ')'" [style.backgroundPosition]="event.bannerPosition || 'center'">
+          <div class="event-banner-img">
+            <img class="banner-img-layer"
+              [src]="event.bannerUrl"
+              [style.transform]="'translate(' + (event.bannerOffsetX ?? 0) + 'px, ' + (event.bannerOffsetY ?? 0) + 'px) scale(' + (event.bannerZoom ?? 1) + ')'"
+              alt="" aria-hidden="true" />
             <div class="banner-top-badge">
               <app-status-badge [status]="event.status"></app-status-badge>
               <span class="category-pill">{{ event.category | uppercase }}</span>
@@ -395,12 +399,23 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
     }
     .event-banner-img {
       height: 200px;
-      background-size: cover;
-      background-position: center;
-      padding: 1rem 1.25rem;
       position: relative;
+      overflow: hidden;
+      padding: 1rem 1.25rem;
+    }
+    .banner-img-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      transform-origin: center center;
+      z-index: 0;
     }
     .banner-top-badge {
+      position: relative;
+      z-index: 1;
       display: flex;
       justify-content: space-between;
       align-items: center;
