@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { EventService } from '../../../core/services/event.service';
 import { RegistrationService } from '../../../core/services/registration.service';
 import { Event, Registration } from '../../../core/models/event.model';
@@ -157,8 +158,9 @@ import { ToastService } from '../../../core/services/toast.service';
           </p>
 
           <div class="modal-qr-box mb-4">
-            <img *ngIf="attendanceQrDataUrl" [src]="attendanceQrDataUrl" alt="Attendance Confirmation QR" class="modal-qr-img" />
-            <div *ngIf="!attendanceQrDataUrl" class="text-sm text-muted">Generating QR code...</div>
+            <div *ngIf="attendanceQrSvg" [innerHTML]="attendanceQrSvg" class="modal-qr-svg"></div>
+            <img *ngIf="!attendanceQrSvg && attendanceQrDataUrl" [src]="attendanceQrDataUrl" alt="Attendance Confirmation QR" class="modal-qr-img" />
+            <div *ngIf="!attendanceQrSvg && !attendanceQrDataUrl" class="text-sm text-muted">Generating QR code...</div>
           </div>
 
           <div class="qr-target-url-box mb-4">
@@ -294,6 +296,17 @@ import { ToastService } from '../../../core/services/toast.service';
       border-radius: var(--radius-md);
       border: 1px solid var(--flat-border);
     }
+    .modal-qr-svg {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-qr-svg svg {
+      width: 100%;
+      height: 100%;
+    }
   `]
 })
 export class EventOverviewTabComponent implements OnInit {
@@ -301,6 +314,8 @@ export class EventOverviewTabComponent implements OnInit {
   registrations: Registration[] = [];
   isAttendanceQrModalOpen = false;
   attendanceQrDataUrl = '';
+  attendanceQrSvg: SafeHtml = '';
+  private attendanceQrSvgRaw = '';
   attendanceConfirmationUrl = '';
 
   constructor(
@@ -308,7 +323,8 @@ export class EventOverviewTabComponent implements OnInit {
     private eventService: EventService,
     private registrationService: RegistrationService,
     private qrService: QRCodeService,
-    private toast: ToastService
+    private toast: ToastService,
+    private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
@@ -367,7 +383,22 @@ export class EventOverviewTabComponent implements OnInit {
     const baseHref = (document.querySelector('base')?.getAttribute('href') ?? '/').replace(/\/$/, '');
     const base = `${window.location.origin}${baseHref}`;
     this.attendanceConfirmationUrl = `${base}/event/${this.event.id}/confirm`;
+    this.attendanceQrDataUrl = '';
+    this.attendanceQrSvg = '';
+    this.attendanceQrSvgRaw = '';
     this.isAttendanceQrModalOpen = true;
+
+    try {
+      // Try SVG first — works without canvas in all browsers
+      const svgString = await this.qrService.generateQRCodeSvg(this.attendanceConfirmationUrl);
+      if (svgString) {
+        this.attendanceQrSvgRaw = svgString;
+        this.attendanceQrSvg = this.sanitizer.bypassSecurityTrustHtml(svgString);
+        return;
+      }
+    } catch (e) {
+      console.error('SVG QR generation failed, trying PNG', e);
+    }
 
     try {
       this.attendanceQrDataUrl = await this.qrService.generateQRCodeDataUrl(this.attendanceConfirmationUrl);
@@ -377,14 +408,27 @@ export class EventOverviewTabComponent implements OnInit {
   }
 
   downloadAttendanceQr(): void {
-    if (!this.attendanceQrDataUrl || !this.event) return;
-    const a = document.createElement('a');
-    a.href = this.attendanceQrDataUrl;
-    a.download = `${this.event.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_Attendance_QR.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    this.toast.success('Attendance Confirmation QR code downloaded!');
+    if (!this.event) return;
+    if (this.attendanceQrDataUrl) {
+      const a = document.createElement('a');
+      a.href = this.attendanceQrDataUrl;
+      a.download = `${this.event.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_Attendance_QR.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      this.toast.success('Attendance Confirmation QR code downloaded!');
+    } else if (this.attendanceQrSvg) {
+      const svgBlob = new Blob([this.attendanceQrSvgRaw], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(svgBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${this.event.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_Attendance_QR.svg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      this.toast.success('Attendance Confirmation QR code downloaded!');
+    }
   }
 
   copyAttendanceUrl(): void {
