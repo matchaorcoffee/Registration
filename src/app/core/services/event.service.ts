@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { Event, EventStatus, CustomQuestion } from '../models/event.model';
 import { StorageService } from './storage.service';
+import LZString from 'lz-string';
 
 @Injectable({
   providedIn: 'root'
@@ -28,6 +29,105 @@ export class EventService {
   public getEventById(id: string): Event | undefined {
     const events = this.getEvents();
     return events.find(e => e.id === id);
+  }
+
+  /**
+   * Compresses event, column mapping, and optional registrations payload into an encoded URL-safe string
+   */
+  public encodeEventPayload(event: Event, registrations: any[] = []): string {
+    const mapping = this.storageService.getSavedMapping(event.id);
+    const questions = this.getCustomQuestionsForEvent(event.id);
+
+    const payload = {
+      e: event,
+      m: mapping,
+      q: questions,
+      r: registrations.map(r => ({
+        id: r.id,
+        eventId: r.eventId,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        fullName: r.fullName,
+        email: r.email,
+        phone: r.phone,
+        company: r.company,
+        jobTitle: r.jobTitle,
+        rsvpStatus: r.rsvpStatus,
+        registrationType: r.registrationType,
+        registrationSource: r.registrationSource,
+        checkInStatus: r.checkInStatus,
+        checkInTime: r.checkInTime,
+        checkedInBy: r.checkedInBy,
+        qrToken: r.qrToken,
+        customAnswers: r.customAnswers,
+        createdAt: r.createdAt
+      }))
+    };
+    try {
+      return LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+    } catch (err) {
+      console.error('Error compressing event payload', err);
+      return '';
+    }
+  }
+
+  /**
+   * Unpacks a compressed event payload and merges into local storage if not already present
+   */
+  public hydrateFromPayload(encodedPayload: string): Event | null {
+    try {
+      // Decode any URI-component escaping if passed via URL
+      const cleanEncoded = encodedPayload.trim();
+      let jsonStr = LZString.decompressFromEncodedURIComponent(cleanEncoded);
+      if (!jsonStr) {
+        jsonStr = LZString.decompressFromEncodedURIComponent(decodeURIComponent(cleanEncoded));
+      }
+      if (!jsonStr) return null;
+
+      const data = JSON.parse(jsonStr);
+      if (!data || !data.e || !data.e.id) return null;
+
+      const event: Event = data.e;
+      const events = this.storageService.getEvents();
+      const existingIdx = events.findIndex(e => e.id === event.id);
+
+      if (existingIdx === -1) {
+        events.unshift(event);
+      } else {
+        events[existingIdx] = { ...events[existingIdx], ...event };
+      }
+      this.storageService.saveEvents(events);
+      this.eventsSubject.next(events);
+
+      // Hydrate custom questions if provided
+      if (Array.isArray(data.q) && data.q.length > 0) {
+        this.saveCustomQuestionsForEvent(event.id, data.q);
+      }
+
+      // Hydrate Excel column mapping preset if provided
+      if (data.m) {
+        this.storageService.saveMapping(event.id, data.m);
+      }
+
+      // Hydrate registrations if provided
+      if (Array.isArray(data.r) && data.r.length > 0) {
+        const regs = this.storageService.getRegistrations();
+        for (const reg of data.r) {
+          const idx = regs.findIndex(r => r.id === reg.id || (r.eventId === reg.eventId && r.email && r.email.toLowerCase() === (reg.email || '').toLowerCase()));
+          if (idx === -1) {
+            regs.push(reg);
+          } else {
+            regs[idx] = { ...regs[idx], ...reg };
+          }
+        }
+        this.storageService.saveRegistrations(regs);
+      }
+
+      return event;
+    } catch (err) {
+      console.error('Error hydrating event from payload', err);
+      return null;
+    }
   }
 
   public createEvent(eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt' | 'status'>, customQuestions?: CustomQuestion[]): Event {

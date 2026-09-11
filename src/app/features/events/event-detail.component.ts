@@ -298,7 +298,8 @@ export class EventDetailComponent implements OnInit {
 
   copyShareLink(): void {
     if (!this.event) return;
-    const url = `${window.location.origin}/event/${this.event.id}/register`;
+    const base = document.baseURI.endsWith('/') ? document.baseURI.slice(0, -1) : document.baseURI;
+    const url = `${base}/event/${this.event.id}/register`;
     navigator.clipboard.writeText(url);
     this.toastService.success('URL Copied', 'Public RSVP URL copied to clipboard.');
   }

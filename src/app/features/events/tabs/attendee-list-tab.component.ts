@@ -38,7 +38,7 @@ import { QrDisplayComponent } from '../../../shared/components/qr-display/qr-dis
               🧹 Clean Duplicates
             </button>
             <a [routerLink]="['/event', event.id, 'register']" target="_blank" class="btn btn-primary btn-sm">
-              🔗 Open Guest RSVP Portal
+              🔗 Open Registration
             </a>
             <button (click)="exportExcel()" class="btn btn-emerald btn-sm">
               📊 Export to Excel (.xlsx)
@@ -649,7 +649,8 @@ export class AttendeeListTabComponent implements OnInit, OnDestroy {
       return;
     }
     const colLabel = this.configColumns.find(c => c.key === this.qrEmailColumnKey)?.label || 'Email';
-    const confirmUrl = `${window.location.origin}/event/${this.event.id}/confirmation/${reg.id}`;
+    const base = document.baseURI.endsWith('/') ? document.baseURI.slice(0, -1) : document.baseURI;
+    const confirmUrl = `${base}/event/${this.event.id}/confirmation/${reg.id}`;
     const subject = encodeURIComponent(`Your QR Pass — ${this.event.name}`);
     const body = encodeURIComponent(
       `Hi,\n\nHere is your QR Check-In Pass for ${this.event.name}.\n\nView & download your pass here:\n${confirmUrl}\n\nRegistration ID: ${reg.id}\n\nSee you there!`

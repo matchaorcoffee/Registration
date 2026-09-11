@@ -4,31 +4,17 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { EventService } from '../../core/services/event.service';
 import { RegistrationService } from '../../core/services/registration.service';
-import { CheckInService } from '../../core/services/checkin.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Event, Registration, User } from '../../core/models/event.model';
+import { Event, User } from '../../core/models/event.model';
 import { StatCardComponent } from '../../shared/components/stat-card/stat-card.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { ModalComponent } from '../../shared/components/modal/modal.component';
-import { RsvpBadgeComponent } from '../../shared/components/rsvp-badge/rsvp-badge.component';
-import { QrDisplayComponent } from '../../shared/components/qr-display/qr-display.component';
-
-interface ConfirmState {
-  step: 'lookup' | 'confirm' | 'walkin' | 'success';
-  query: string;
-  results: Registration[];
-  searched: boolean;
-  selected: Registration | null;
-  confirmed: Registration | null;
-  confirming: boolean;
-  wiData: { name: string; email: string; company: string };
-}
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, StatCardComponent, StatusBadgeComponent, ModalComponent, RsvpBadgeComponent, QrDisplayComponent],
+  imports: [CommonModule, RouterLink, FormsModule, StatCardComponent, StatusBadgeComponent, ModalComponent],
   template: `
     <div class="dashboard-page container">
       <!-- Top Title & Quick Actions -->
@@ -84,13 +70,14 @@ interface ConfirmState {
         ></app-stat-card>
       </div>
 
-      <!-- Event List with Inline Attendance Confirmation -->
+      <!-- Event Cards Grid Section -->
       <div class="events-section">
         <div class="events-toolbar flex justify-between items-center">
           <div class="flex items-center gap-3">
             <h2 class="section-title">Your Events</h2>
             <span class="count-pill">{{ filteredEvents.length }}</span>
           </div>
+
           <!-- Category Filter Tabs -->
           <div class="filter-tabs">
             <button
@@ -98,164 +85,84 @@ interface ConfirmState {
               (click)="selectedCategory = cat"
               [class.active]="selectedCategory === cat"
               class="filter-tab"
-            >{{ cat | titlecase }}</button>
+            >
+              {{ cat | titlecase }}
+            </button>
           </div>
         </div>
 
-        <!-- Each event row -->
-        <div *ngFor="let evt of filteredEvents" class="event-confirm-row">
-
-          <!-- ── Top: Event summary bar ── -->
-          <div class="ecr-summary">
-            <div class="ecr-banner"
+        <div class="grid grid-cols-3 gap-6 event-cards-grid">
+          <div *ngFor="let evt of filteredEvents" class="flat-event-card">
+            <!-- Event Card Banner -->
+            <div class="event-banner-wrap"
               [style.backgroundImage]="'url(' + evt.bannerUrl + ')'"
-              [style.backgroundSize]="evt.bannerImgW ? (evt.bannerImgW + 'px ' + evt.bannerImgH + 'px') : 'contain'"
+              [style.backgroundSize]="evt.bannerImgW ? (evt.bannerImgW + 'px ' + evt.bannerImgH + 'px') : 'cover'"
               [style.backgroundPosition]="evt.bannerImgW ? (evt.bannerOffsetX + 'px ' + evt.bannerOffsetY + 'px') : 'center'"
             >
-              <div class="ecr-banner-overlay">
+              <div class="banner-overlay">
                 <app-status-badge [status]="evt.status"></app-status-badge>
                 <span class="category-pill">{{ evt.category | uppercase }}</span>
               </div>
             </div>
 
-            <div class="ecr-info">
-              <div class="ecr-meta">
+            <!-- Event Card Content -->
+            <div class="event-card-content">
+              <div class="event-schedule">
                 <span>🗓 {{ evt.date }}</span>
                 <span>⏰ {{ evt.startTime }} – {{ evt.endTime }}</span>
-                <span>📍 {{ evt.venue }}</span>
               </div>
-              <h3 class="ecr-title">{{ evt.name }}</h3>
-              <div class="ecr-stats">
-                <span class="checkin-badge">✓ {{ getEventCheckedInCount(evt.id) }} Checked In</span>
-                <span class="text-xs text-muted">{{ getEventRegCount(evt.id) }} / {{ evt.capacity }} registered</span>
-              </div>
-            </div>
 
-            <div class="ecr-actions">
-              <a [routerLink]="['/events', evt.id]" class="btn btn-primary btn-sm">Manage →</a>
-              <a [routerLink]="['/events', evt.id, 'check-in']" class="btn btn-emerald btn-sm" *ngIf="evt.isQrEnabled !== false">📷 QR Check-In</a>
-              <a [routerLink]="['/events', evt.id, 'attendees']" class="btn btn-secondary btn-sm">👥 Attendees</a>
-              <button (click)="openDuplicateModal(evt)" class="btn btn-outline-dark btn-sm">📋 Clone</button>
-              <span class="rsvp-link-copy" (click)="copyShareLink(evt.id)">🔗 Share URL</span>
-            </div>
-          </div>
+              <h3 class="event-card-title">{{ evt.name }}</h3>
+              <p class="event-card-venue">📍 {{ evt.venue }}</p>
 
-          <!-- ── Bottom: Inline Attendance Confirmation ── -->
-          <div class="ecr-confirm-panel">
-            <div class="ecp-header">
-              <span class="ecp-label">✅ Attendance Confirmation Kiosk</span>
-              <span class="text-xs text-muted">Search an existing registration to confirm attendance{{ evt.isWalkInAllowed ? ', or register a walk-in.' : '.' }}</span>
-            </div>
-
-            <!-- Search bar -->
-            <ng-container *ngIf="getConfirmState(evt.id).step === 'lookup'">
-              <form (ngSubmit)="doSearch(evt.id)" class="ecp-search-row">
-                <input
-                  type="text"
-                  class="form-control form-control-sm"
-                  [(ngModel)]="getConfirmState(evt.id).query"
-                  [name]="'q_' + evt.id"
-                  placeholder="Name, Email, or Registration ID…"
-                />
-                <button type="submit" class="btn btn-primary btn-sm" [disabled]="!getConfirmState(evt.id).query.trim()">🔍 Find</button>
-                <button *ngIf="evt.isWalkInAllowed" type="button" class="btn btn-walkin-sm btn-sm" (click)="getConfirmState(evt.id).step = 'walkin'; resetWalkInState(evt.id)">⚡ Walk-In</button>
-              </form>
-
-              <!-- No results -->
-              <p *ngIf="getConfirmState(evt.id).searched && getConfirmState(evt.id).results.length === 0"
-                class="text-xs text-coral mt-2">No registrations found. Try a different query.</p>
-
-              <!-- Results -->
-              <div *ngIf="getConfirmState(evt.id).results.length > 0" class="ecp-results">
-                <div
-                  *ngFor="let r of getConfirmState(evt.id).results"
-                  class="ecp-result-row"
-                  (click)="selectForConfirm(evt.id, r)"
-                >
-                  <div>
-                    <strong class="text-sm">{{ r.firstName }} {{ r.lastName }}</strong>
-                    <span class="text-xs text-muted ml-2">{{ r.email }}</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <app-rsvp-badge [status]="r.rsvpStatus"></app-rsvp-badge>
-                    <span class="text-xs text-primary font-bold">Select →</span>
-                  </div>
+              <!-- Mini Capacity Meter -->
+              <div class="event-capacity-box">
+                <div class="flex justify-between text-xs">
+                  <span class="font-bold">Registrations</span>
+                  <span class="text-muted">
+                    {{ getEventRegCount(evt.id) }} / {{ evt.capacity }}
+                  </span>
+                </div>
+                <div class="progress-track">
+                  <div
+                    class="progress-bar-fill"
+                    [style.width.%]="getCapacityPercent(evt.id, evt.capacity)"
+                  ></div>
                 </div>
               </div>
-            </ng-container>
 
-            <!-- Confirm step -->
-            <ng-container *ngIf="getConfirmState(evt.id).step === 'confirm' && getConfirmState(evt.id).selected">
-              <div class="ecp-confirm-block">
-                <div class="ecp-reg-detail">
-                  <span class="font-mono text-xs text-primary">{{ getConfirmState(evt.id).selected!.id }}</span>
-                  <strong class="ml-2">{{ getConfirmState(evt.id).selected!.firstName }} {{ getConfirmState(evt.id).selected!.lastName }}</strong>
-                  <span class="text-xs text-muted ml-2">{{ getConfirmState(evt.id).selected!.email }}</span>
-                  <app-rsvp-badge [status]="getConfirmState(evt.id).selected!.rsvpStatus" class="ml-2"></app-rsvp-badge>
-                </div>
-                <div class="flex gap-2 mt-2">
-                  <button class="btn btn-emerald btn-sm" (click)="confirmAttendance(evt.id)" [disabled]="getConfirmState(evt.id).confirming">
-                    {{ getConfirmState(evt.id).confirming ? 'Confirming…' : '✅ Confirm Attending' }}
+              <!-- Check-In Live Status Pill -->
+              <div class="event-checkin-summary">
+                <span class="checkin-badge">
+                  ✓ {{ getEventCheckedInCount(evt.id) }} Checked In
+                </span>
+                <span class="rsvp-link-copy" (click)="copyShareLink(evt.id)" title="Copy Public RSVP Link">
+                  🔗 Share URL
+                </span>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="event-card-actions">
+                <a [routerLink]="['/events', evt.id]" class="btn btn-primary btn-sm btn-block">
+                  Manage Hub →
+                </a>
+                <div class="flex gap-2">
+                  <a [routerLink]="['/events', evt.id, 'check-in']" class="btn btn-emerald btn-sm" title="Open Check-in Terminal">
+                    📷 Check-In
+                  </a>
+                  <a [routerLink]="['/events', evt.id, 'attendees']" class="btn btn-secondary btn-sm" title="Attendee List">
+                    👥 Attendees
+                  </a>
+                  <button (click)="openDuplicateModal(evt)" class="btn btn-outline-dark btn-sm" title="Duplicate Event">
+                    📋 Clone
                   </button>
-                  <button class="btn btn-secondary btn-sm" (click)="resetConfirmState(evt.id)">← Back</button>
                 </div>
               </div>
-            </ng-container>
-
-            <!-- Walk-In step -->
-            <ng-container *ngIf="getConfirmState(evt.id).step === 'walkin'">
-              <form (ngSubmit)="submitWalkIn(evt.id)" #wiForm="ngForm" class="ecp-walkin-form">
-                <div class="ecp-walkin-fields">
-                  <div class="form-group mb-0">
-                    <label class="form-label text-xs">Full Name *</label>
-                    <input type="text" class="form-control form-control-sm"
-                      [(ngModel)]="getConfirmState(evt.id).wiData.name" name="wi_name" required placeholder="Jane Doe" />
-                  </div>
-                  <div class="form-group mb-0">
-                    <label class="form-label text-xs">Email *</label>
-                    <input type="email" class="form-control form-control-sm"
-                      [(ngModel)]="getConfirmState(evt.id).wiData.email" name="wi_email" required placeholder="jane@co.com" />
-                  </div>
-                  <div class="form-group mb-0">
-                    <label class="form-label text-xs">Organization</label>
-                    <input type="text" class="form-control form-control-sm"
-                      [(ngModel)]="getConfirmState(evt.id).wiData.company" name="wi_company" placeholder="Optional" />
-                  </div>
-                </div>
-                <div class="flex gap-2 mt-2">
-                  <button type="submit" class="btn btn-emerald btn-sm" [disabled]="wiForm.invalid || getConfirmState(evt.id).confirming">
-                    {{ getConfirmState(evt.id).confirming ? 'Registering…' : '⚡ Register & Check In' }}
-                  </button>
-                  <button type="button" class="btn btn-secondary btn-sm" (click)="resetConfirmState(evt.id)">Cancel</button>
-                </div>
-              </form>
-            </ng-container>
-
-            <!-- Success step -->
-            <ng-container *ngIf="getConfirmState(evt.id).step === 'success' && getConfirmState(evt.id).confirmed">
-              <div class="ecp-success-block">
-                <div class="ecp-success-badge">✓</div>
-                <div class="ecp-success-info">
-                  <strong>{{ getConfirmState(evt.id).confirmed!.firstName }} {{ getConfirmState(evt.id).confirmed!.lastName }}</strong>
-                  <span class="font-mono text-xs text-primary ml-2">{{ getConfirmState(evt.id).confirmed!.id }}</span>
-                  <span class="badge badge-emerald ml-2">CONFIRMED ATTENDING</span>
-                </div>
-                <!-- Mini QR if enabled -->
-                <div *ngIf="evt.isQrEnabled !== false && getConfirmState(evt.id).confirmed!.qrToken" class="ecp-qr-mini">
-                  <app-qr-display
-                    [token]="getConfirmState(evt.id).confirmed!.qrToken"
-                    [guestName]="getConfirmState(evt.id).confirmed!.firstName + ' ' + getConfirmState(evt.id).confirmed!.lastName"
-                    [regId]="getConfirmState(evt.id).confirmed!.id"
-                    [showActions]="true"
-                  ></app-qr-display>
-                </div>
-                <button class="btn btn-secondary btn-sm mt-2" (click)="resetConfirmState(evt.id)">Next Guest</button>
-              </div>
-            </ng-container>
+            </div>
           </div>
         </div>
 
-        <!-- Empty State -->
+        <!-- Empty State When Organizer Has No Events -->
         <div *ngIf="filteredEvents.length === 0" class="flat-card text-center py-8">
           <div class="empty-icon text-3xl mb-2">📅</div>
           <h3 class="text-lg font-extrabold text-dark">No Events Found</h3>
@@ -544,185 +451,6 @@ interface ConfirmState {
       display: flex;
       gap: 0.5rem;
     }
-    /* ── Event Confirm Row ── */
-    .event-confirm-row {
-      background: var(--flat-white);
-      border: 2px solid var(--flat-border);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-      margin-bottom: 1.25rem;
-    }
-    .ecr-summary {
-      display: flex;
-      gap: 0;
-      align-items: stretch;
-      border-bottom: 1px solid var(--flat-border);
-    }
-    .ecr-banner {
-      width: 140px;
-      min-height: 100px;
-      flex-shrink: 0;
-      background-color: #111;
-      background-repeat: no-repeat;
-    }
-    .ecr-banner-overlay {
-      padding: 0.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      background: linear-gradient(to bottom, rgba(15,23,42,0.55) 0%, transparent 100%);
-      height: 100%;
-    }
-    .ecr-info {
-      flex: 1;
-      padding: 0.85rem 1rem;
-      min-width: 0;
-    }
-    .ecr-meta {
-      display: flex;
-      gap: 1rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: var(--flat-primary);
-      margin-bottom: 0.3rem;
-      flex-wrap: wrap;
-    }
-    .ecr-title {
-      font-size: 1.05rem;
-      font-weight: 800;
-      color: var(--flat-dark);
-      margin-bottom: 0.35rem;
-    }
-    .ecr-stats {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-size: 0.775rem;
-    }
-    .ecr-actions {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 0.4rem;
-      padding: 0.85rem 1rem;
-      border-left: 1px solid var(--flat-border);
-      min-width: 170px;
-    }
-    /* ── Confirm Panel ── */
-    .ecr-confirm-panel {
-      padding: 0.85rem 1.1rem;
-      background: var(--flat-gray-50);
-    }
-    .ecp-header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.65rem;
-      flex-wrap: wrap;
-    }
-    .ecp-label {
-      font-size: 0.8rem;
-      font-weight: 800;
-      color: var(--flat-dark);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .ecp-search-row {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-    }
-    .ecp-search-row input {
-      flex: 1;
-    }
-    .ecp-results {
-      margin-top: 0.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-    .ecp-result-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.5rem 0.75rem;
-      background: var(--flat-white);
-      border: 1px solid var(--flat-border);
-      border-radius: var(--radius-md);
-      cursor: pointer;
-    }
-    .ecp-result-row:hover {
-      border-color: var(--flat-primary);
-      background: var(--flat-primary-light);
-    }
-    .ecp-confirm-block {
-      background: var(--flat-white);
-      border: 1px solid var(--flat-border);
-      border-radius: var(--radius-md);
-      padding: 0.75rem 1rem;
-    }
-    .ecp-reg-detail {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      font-size: 0.875rem;
-    }
-    .ecp-walkin-form {
-      background: var(--flat-white);
-      border: 1px solid var(--flat-border);
-      border-radius: var(--radius-md);
-      padding: 0.75rem 1rem;
-    }
-    .ecp-walkin-fields {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.65rem;
-      margin-bottom: 0.5rem;
-    }
-    .ecp-success-block {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-      background: var(--flat-emerald-light);
-      border: 1px solid var(--flat-emerald);
-      border-radius: var(--radius-md);
-      padding: 0.65rem 1rem;
-    }
-    .ecp-success-badge {
-      width: 32px;
-      height: 32px;
-      background: var(--flat-emerald);
-      color: #fff;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 1rem;
-      flex-shrink: 0;
-    }
-    .ecp-success-info {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      font-size: 0.875rem;
-    }
-    .ecp-qr-mini {
-      margin-left: auto;
-    }
-    .btn-walkin-sm {
-      background: var(--flat-violet);
-      color: #fff;
-      border: none;
-    }
-    .btn-walkin-sm:hover {
-      background: var(--flat-indigo);
-    }
   `]
 })
 export class DashboardComponent implements OnInit {
@@ -769,12 +497,9 @@ export class DashboardComponent implements OnInit {
 
   currentUser: User | null = null;
 
-  confirmStates: Record<string, ConfirmState> = {};
-
   constructor(
     private eventService: EventService,
     private registrationService: RegistrationService,
-    private checkInService: CheckInService,
     private toastService: ToastService,
     private authService: AuthService
   ) {
@@ -830,99 +555,9 @@ export class DashboardComponent implements OnInit {
     return Math.min(100, Math.round((count / capacity) * 100));
   }
 
-  getConfirmState(eventId: string): ConfirmState {
-    if (!this.confirmStates[eventId]) {
-      this.confirmStates[eventId] = {
-        step: 'lookup',
-        query: '',
-        results: [],
-        searched: false,
-        selected: null,
-        confirmed: null,
-        confirming: false,
-        wiData: { name: '', email: '', company: '' }
-      };
-    }
-    return this.confirmStates[eventId];
-  }
-
-  doSearch(eventId: string): void {
-    const state = this.getConfirmState(eventId);
-    const q = state.query.trim().toLowerCase();
-    if (!q) return;
-    state.results = this.registrationService.lookupRegistration(q, eventId);
-    state.searched = true;
-  }
-
-  selectForConfirm(eventId: string, reg: Registration): void {
-    const state = this.getConfirmState(eventId);
-    state.selected = reg;
-    state.step = 'confirm';
-  }
-
-  confirmAttendance(eventId: string): void {
-    const state = this.getConfirmState(eventId);
-    if (!state.selected) return;
-    state.confirming = true;
-    const result = this.checkInService.verifyAndCheckIn(state.selected.id, eventId, 'Organizer (Kiosk)');
-    state.confirming = false;
-    if (result.status === 'success' || result.status === 'already-checked-in') {
-      state.confirmed = result.registration || state.selected;
-      state.step = 'success';
-      if (result.status === 'success') {
-        this.toastService.success('Attendance Confirmed', `${state.confirmed.firstName} ${state.confirmed.lastName} is checked in.`);
-      } else {
-        this.toastService.success('Already Checked In', `${state.confirmed.firstName} ${state.confirmed.lastName} was already checked in.`);
-      }
-    } else {
-      this.toastService.error('Check-In Failed', result.message);
-    }
-  }
-
-  resetConfirmState(eventId: string): void {
-    this.confirmStates[eventId] = {
-      step: 'lookup',
-      query: '',
-      results: [],
-      searched: false,
-      selected: null,
-      confirmed: null,
-      confirming: false,
-      wiData: { name: '', email: '', company: '' }
-    };
-  }
-
-  resetWalkInState(eventId: string): void {
-    const state = this.getConfirmState(eventId);
-    state.wiData = { name: '', email: '', company: '' };
-  }
-
-  submitWalkIn(eventId: string): void {
-    const state = this.getConfirmState(eventId);
-    const { name, email, company } = state.wiData;
-    if (!name.trim() || !email.trim()) return;
-    const parts = name.trim().split(' ');
-    const firstName = parts[0];
-    const lastName = parts.slice(1).join(' ') || '-';
-    state.confirming = true;
-    const reg = this.registrationService.registerWalkIn({
-      eventId,
-      firstName,
-      lastName,
-      email: email.trim(),
-      company: company.trim() || undefined,
-      checkedInBy: 'Organizer (Walk-In Kiosk)'
-    });
-    state.confirming = false;
-    state.confirmed = reg;
-    state.step = 'success';
-    this.toastService.success('Walk-In Registered', `${reg.firstName} ${reg.lastName} has been registered and checked in.`);
-    this.loadEvents();
-  }
-
   copyShareLink(eventId: string): void {
-    const origin = window.location.origin;
-    const url = `${origin}/event/${eventId}/register`;
+    const base = document.baseURI.endsWith('/') ? document.baseURI.slice(0, -1) : document.baseURI;
+    const url = `${base}/event/${eventId}/register`;
     navigator.clipboard.writeText(url);
     this.toastService.success('URL Copied', 'Public RSVP link copied to clipboard.');
   }

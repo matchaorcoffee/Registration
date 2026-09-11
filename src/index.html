@@ -25,8 +25,9 @@
         if (decoded.p !== undefined) {
           var path = decoded.p.replace(/~and~/g, '&');
           var query = decoded.q ? '?' + decoded.q.replace(/~and~/g, '&') : '';
-          // path has no leading slash; add one separator only when path is non-empty
-          var fullPath = '/Registration/' + (path ? path : '') + query;
+          var base = (document.querySelector('base') && document.querySelector('base').getAttribute('href')) || '/';
+          if (!base.endsWith('/')) base += '/';
+          var fullPath = base + (path ? path : '') + query;
           window.history.replaceState(null, null, fullPath);
         }
       }

@@ -172,30 +172,34 @@ import { AuthService } from '../../core/services/auth.service';
           <div class="grid grid-cols-3 gap-3">
             <div class="form-group">
               <label class="form-label">Event Date <span class="required-star">*</span></label>
-              <input type="date" class="form-control" formControlName="date" />
+              <input type="date" class="form-control" [class.is-invalid]="isFieldInvalid('date')" formControlName="date" />
               <div *ngIf="isFieldInvalid('date')" class="form-error">Date is required.</div>
             </div>
 
             <div class="form-group">
               <label class="form-label">Start Time <span class="required-star">*</span></label>
-              <input type="time" class="form-control" formControlName="startTime" />
+              <input type="time" class="form-control" [class.is-invalid]="isFieldInvalid('startTime')" formControlName="startTime" />
+              <div *ngIf="isFieldInvalid('startTime')" class="form-error">Start time is required.</div>
             </div>
 
             <div class="form-group">
               <label class="form-label">End Time <span class="required-star">*</span></label>
-              <input type="time" class="form-control" formControlName="endTime" />
+              <input type="time" class="form-control" [class.is-invalid]="isFieldInvalid('endTime')" formControlName="endTime" />
+              <div *ngIf="isFieldInvalid('endTime')" class="form-error">End time is required.</div>
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div class="form-group">
               <label class="form-label">Venue Name <span class="required-star">*</span></label>
-              <input 
-                type="text" 
-                class="form-control" 
-                formControlName="venue" 
-                placeholder="e.g. Grand Silicon Center - Hall B" 
+              <input
+                type="text"
+                class="form-control"
+                [class.is-invalid]="isFieldInvalid('venue')"
+                formControlName="venue"
+                placeholder="e.g. Grand Silicon Center - Hall B"
               />
+              <div *ngIf="isFieldInvalid('venue')" class="form-error">Venue name is required.</div>
             </div>
 
             <div class="form-group">
@@ -207,6 +211,7 @@ import { AuthService } from '../../core/services/auth.service';
                   <input
                     type="text"
                     class="form-control"
+                    [class.is-invalid]="isFieldInvalid('address')"
                     formControlName="address"
                     placeholder="Search venue, landmark or address…"
                     (input)="onPhotonInput($any($event))"
@@ -237,24 +242,28 @@ import { AuthService } from '../../core/services/auth.service';
                   >✕ Close</div>
                 </div>
               </div>
+              <div *ngIf="isFieldInvalid('address')" class="form-error">Physical address is required.</div>
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div class="form-group">
               <label class="form-label">Registration Deadline <span class="required-star">*</span></label>
-              <input type="date" class="form-control" formControlName="registrationDeadline" />
+              <input type="date" class="form-control" [class.is-invalid]="isFieldInvalid('registrationDeadline')" formControlName="registrationDeadline" />
+              <div *ngIf="isFieldInvalid('registrationDeadline')" class="form-error">Registration deadline is required.</div>
             </div>
 
             <div class="form-group">
               <label class="form-label">Maximum Capacity <span class="required-star">*</span></label>
-              <input 
-                type="number" 
-                class="form-control" 
-                formControlName="capacity" 
-                min="1" 
-                placeholder="e.g. 300" 
+              <input
+                type="number"
+                class="form-control"
+                [class.is-invalid]="isFieldInvalid('capacity')"
+                formControlName="capacity"
+                min="1"
+                placeholder="e.g. 300"
               />
+              <div *ngIf="isFieldInvalid('capacity')" class="form-error">Valid capacity (min 1) is required.</div>
             </div>
           </div>
         </div>
@@ -266,11 +275,13 @@ import { AuthService } from '../../core/services/auth.service';
           <div class="grid grid-cols-3 gap-3">
             <div class="form-group">
               <label class="form-label">Organizer Name <span class="required-star">*</span></label>
-              <input type="text" class="form-control" formControlName="organizerName" />
+              <input type="text" class="form-control" [class.is-invalid]="isFieldInvalid('organizerName')" formControlName="organizerName" />
+              <div *ngIf="isFieldInvalid('organizerName')" class="form-error">Organizer name is required.</div>
             </div>
             <div class="form-group">
               <label class="form-label">Contact Email <span class="required-star">*</span></label>
-              <input type="email" class="form-control" formControlName="contactEmail" />
+              <input type="email" class="form-control" [class.is-invalid]="isFieldInvalid('contactEmail')" formControlName="contactEmail" />
+              <div *ngIf="isFieldInvalid('contactEmail')" class="form-error">Valid contact email is required.</div>
             </div>
             <div class="form-group">
               <label class="form-label">Contact Phone</label>
@@ -319,7 +330,7 @@ import { AuthService } from '../../core/services/auth.service';
           <a [routerLink]="isEditMode ? ['/events', eventId] : '/dashboard'" class="btn btn-secondary">
             Cancel
           </a>
-          <button type="submit" [disabled]="eventForm.invalid || isSubmitting" class="btn btn-primary btn-lg">
+          <button type="submit" [disabled]="isSubmitting" class="btn btn-primary btn-lg">
             {{ isEditMode ? 'Save Event Changes' : 'Publish Event & Open RSVP →' }}
           </button>
         </div>
@@ -790,6 +801,22 @@ export class EventFormComponent implements OnInit {
   ngOnInit(): void {
     this.initForm();
     this.initPhotonSearch();
+
+    // Listen to currentUser$ in case authentication hydrates asynchronously (e.g. from IndexedDB on fresh load)
+    this.authService.currentUser$.subscribe(user => {
+      if (user) {
+        this.currentOrganizerId = user.id;
+        if (!this.isEditMode) {
+          if (!this.eventForm.get('organizerName')?.value || this.eventForm.get('organizerName')?.value === 'Organizer') {
+            this.eventForm.patchValue({ organizerName: user.name });
+          }
+          if (!this.eventForm.get('contactEmail')?.value || this.eventForm.get('contactEmail')?.value === 'organizer@evently.io') {
+            this.eventForm.patchValue({ contactEmail: user.email });
+          }
+        }
+      }
+    });
+
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEditMode = true;
@@ -803,7 +830,9 @@ export class EventFormComponent implements OnInit {
     const defaultDate     = new Date(today.getTime() + 14 * 86400000).toISOString().split('T')[0];
     const defaultDeadline = new Date(today.getTime() + 10 * 86400000).toISOString().split('T')[0];
     const currentUser = this.authService.currentUserValue;
-    if (currentUser) { this.currentOrganizerId = currentUser.id; }
+    if (currentUser) {
+      this.currentOrganizerId = currentUser.id;
+    }
 
     this.eventForm = this.fb.group({
       name:                 ['', [Validators.required, Validators.minLength(3)]],
@@ -818,8 +847,8 @@ export class EventFormComponent implements OnInit {
       address:              ['', Validators.required],
       registrationDeadline: [defaultDeadline, Validators.required],
       capacity:             [200, [Validators.required, Validators.min(1)]],
-      organizerName:        [currentUser?.name  || 'Alex Rivera',              Validators.required],
-      contactEmail:         [currentUser?.email || 'alex.organizer@evently.io', [Validators.required, Validators.email]],
+      organizerName:        [currentUser?.name  || 'Organizer',            Validators.required],
+      contactEmail:         [currentUser?.email || 'organizer@evently.io', [Validators.required, Validators.email]],
       contactNumber:        ['+1 (555) 234-5678', Validators.pattern(/^[0-9+\-()\s.ext]+$/)],
       isWalkInAllowed:      [true],
       isRsvpEnabled:        [true],
@@ -908,43 +937,84 @@ export class EventFormComponent implements OnInit {
   onSubmit(): void {
     if (this.eventForm.invalid) {
       this.eventForm.markAllAsTouched();
-      this.toastService.error('Form Incomplete', 'Please fill in all required fields.');
+      const invalidFields: string[] = [];
+      const labels: Record<string, string> = {
+        name: 'Event Name',
+        description: 'Event Description',
+        date: 'Event Date',
+        startTime: 'Start Time',
+        endTime: 'End Time',
+        venue: 'Venue Name',
+        address: 'Physical Address',
+        registrationDeadline: 'Registration Deadline',
+        capacity: 'Maximum Capacity',
+        organizerName: 'Organizer Name',
+        contactEmail: 'Contact Email',
+        contactNumber: 'Contact Phone'
+      };
+      Object.keys(this.eventForm.controls).forEach(key => {
+        if (this.eventForm.get(key)?.invalid) {
+          invalidFields.push(labels[key] || key);
+        }
+      });
+      const fieldList = invalidFields.length > 0 ? `: ${invalidFields.join(', ')}` : '';
+      this.toastService.error('Form Incomplete', `Please check required fields${fieldList}`);
       return;
     }
 
-    this.isSubmitting = true;
-    const formVal = this.eventForm.value;
+    try {
+      this.isSubmitting = true;
+      const formVal = this.eventForm.value;
 
-    // Attach all banner editor pixel values so they can be restored exactly on next edit.
-    const bannerExtra = {
-      bannerOffsetX:  this.bannerOffsetX,
-      bannerOffsetY:  this.bannerOffsetY,
-      bannerZoom:     this.bannerZoom,
-      bannerImgW:     this.imgDisplayW > 0 ? this.imgDisplayW : undefined,
-      bannerImgH:     this.imgDisplayH > 0 ? this.imgDisplayH : undefined,
-      bannerCanvasW:  this.canvasW     > 0 ? this.canvasW     : undefined,
-    };
+      // Attach all banner editor pixel values so they can be restored exactly on next edit.
+      const bannerExtra = {
+        bannerOffsetX:  this.bannerOffsetX,
+        bannerOffsetY:  this.bannerOffsetY,
+        bannerZoom:     this.bannerZoom,
+        bannerImgW:     this.imgDisplayW > 0 ? this.imgDisplayW : undefined,
+        bannerImgH:     this.imgDisplayH > 0 ? this.imgDisplayH : undefined,
+        bannerCanvasW:  this.canvasW     > 0 ? this.canvasW     : undefined,
+      };
 
-    const coordsExtra = {
-      latitude:  this.selectedLat  ?? undefined,
-      longitude: this.selectedLng ?? undefined,
-    };
+      const coordsExtra = {
+        latitude:  this.selectedLat  ?? undefined,
+        longitude: this.selectedLng ?? undefined,
+      };
 
-    if (this.isEditMode) {
-      this.eventService.updateEvent(this.eventId, { ...formVal, ...bannerExtra, ...coordsExtra });
-      this.eventService.saveCustomQuestionsForEvent(this.eventId, this.customQuestions);
-      this.toastService.success('Event Updated', 'Changes saved successfully.');
-      this.router.navigate(['/events', this.eventId]);
-    } else {
-      const created = this.eventService.createEvent({
-        ...formVal,
-        ...bannerExtra,
-        ...coordsExtra,
-        organizerId: this.currentOrganizerId,
-        badgeColor: '#2563eb'
-      }, this.customQuestions);
-      this.toastService.success('Event Created', `"${created.name}" is now live!`);
-      this.router.navigate(['/events', created.id]);
+      const activeUserId = this.authService.currentUserValue?.id || this.currentOrganizerId;
+
+      if (this.isEditMode) {
+        const updated = this.eventService.updateEvent(this.eventId, { ...formVal, ...bannerExtra, ...coordsExtra });
+        if (!updated) {
+          this.toastService.error('Update Failed', 'Event could not be found or updated.');
+          this.isSubmitting = false;
+          return;
+        }
+        this.eventService.saveCustomQuestionsForEvent(this.eventId, this.customQuestions);
+        this.toastService.success('Event Updated', 'Changes saved successfully.');
+        this.router.navigate(['/events', this.eventId]);
+      } else {
+        const created = this.eventService.createEvent({
+          ...formVal,
+          ...bannerExtra,
+          ...coordsExtra,
+          organizerId: activeUserId,
+          badgeColor: '#2563eb'
+        }, this.customQuestions);
+
+        if (!created || !created.id) {
+          this.toastService.error('Creation Failed', 'Could not create event. Please try again.');
+          this.isSubmitting = false;
+          return;
+        }
+
+        this.toastService.success('Event Created', `"${created.name}" is now live!`);
+        this.router.navigate(['/events', created.id]);
+      }
+    } catch (err: any) {
+      console.error('Error during event submission:', err);
+      this.isSubmitting = false;
+      this.toastService.error('Unexpected Error', err?.message || 'An error occurred while publishing the event.');
     }
   }
 

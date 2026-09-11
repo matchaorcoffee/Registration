@@ -8,13 +8,14 @@ import { ToastService } from '../../core/services/toast.service';
 import { Event, Registration } from '../../core/models/event.model';
 import { QrDisplayComponent } from '../../shared/components/qr-display/qr-display.component';
 import { RsvpBadgeComponent } from '../../shared/components/rsvp-badge/rsvp-badge.component';
+import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 
 type WalkInField = { key: string; label: string; isCustom?: boolean; isPrimaryKey?: boolean; required?: boolean };
 
 @Component({
   selector: 'app-attendance-confirmation',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, QrDisplayComponent, RsvpBadgeComponent],
+  imports: [CommonModule, FormsModule, RouterLink, QrDisplayComponent, RsvpBadgeComponent, StatusBadgeComponent],
   template: `
     <div class="confirm-wrapper container container-narrow">
 
@@ -27,17 +28,65 @@ type WalkInField = { key: string; label: string; isCustom?: boolean; isPrimaryKe
       </div>
 
       <ng-container *ngIf="event">
-        <!-- Page Header -->
-        <div class="page-header text-center">
+        <!-- Event Top Header Banner -->
+        <div class="event-hero-card">
+          <div class="event-banner-img"
+            [style.backgroundImage]="'url(' + event.bannerUrl + ')'"
+            [style.backgroundSize]="event.bannerImgW ? (event.bannerImgW + 'px ' + event.bannerImgH + 'px') : 'contain'"
+            [style.backgroundPosition]="event.bannerImgW ? (event.bannerOffsetX + 'px ' + event.bannerOffsetY + 'px') : 'center'"
+          >
+            <div class="banner-top-badge">
+              <app-status-badge [status]="event.status"></app-status-badge>
+              <span class="category-pill">{{ event.category | uppercase }}</span>
+            </div>
+          </div>
+
+          <div class="hero-body">
+            <span class="event-badge-label">OFFICIAL EVENT REGISTRATION</span>
+            <h1 class="event-title">{{ event.name }}</h1>
+            <p class="event-tagline" *ngIf="event.tagline">{{ event.tagline }}</p>
+
+            <div class="event-schedule-grid">
+              <div class="schedule-box">
+                <span class="s-icon">🗓</span>
+                <div>
+                  <span class="s-label">Date & Time</span>
+                  <strong class="s-val">{{ event.date }} • {{ event.startTime }} - {{ event.endTime }}</strong>
+                </div>
+              </div>
+
+              <div class="schedule-box">
+                <span class="s-icon">📍</span>
+                <div>
+                  <span class="s-label">Location / Venue</span>
+                  <strong class="s-val">{{ event.venue }}</strong>
+                  <p class="text-xs text-muted" *ngIf="event.address">{{ event.address }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Registration Deadline & Capacity Alert -->
+            <div class="deadline-strip flex justify-between items-center" *ngIf="isRegistrationOpen">
+              <span class="text-xs font-bold text-gray-700">
+                ⏳ RSVP Deadline: <strong>{{ event.registrationDeadline }}</strong>
+              </span>
+              <span class="text-xs font-bold text-emerald">
+                ✓ Available Slots: <strong>{{ remainingSlots }} left</strong>
+              </span>
+            </div>
+
+            <div *ngIf="!isRegistrationOpen" class="closed-alert">
+              <strong>Registration is currently closed for this event.</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section Title for Attendance Confirmation -->
+        <div class="attendance-section-header">
           <span class="page-tag">ATTENDANCE CONFIRMATION</span>
-          <h1 class="page-title">{{ event.name }}</h1>
           <p class="page-sub text-muted">
             Already registered? Enter your details below to confirm your attendance.
           </p>
-          <div class="event-meta-strip">
-            <span>🗓 {{ event.date }} &bull; {{ event.startTime }} – {{ event.endTime }}</span>
-            <span>📍 {{ event.venue }}</span>
-          </div>
         </div>
 
         <!-- STEP 1: Lookup -->
@@ -160,7 +209,7 @@ type WalkInField = { key: string; label: string; isCustom?: boolean; isPrimaryKe
               <span *ngIf="isConfirming">Confirming...</span>
             </button>
             <p class="text-xs text-center text-muted mt-2">
-              This will update your RSVP to <strong>Attending</strong>.
+              This will update your RSVP to <strong>Attending</strong> and mark you as <strong>Checked In</strong>.
             </p>
           </div>
         </div>
@@ -303,7 +352,7 @@ type WalkInField = { key: string; label: string; isCustom?: boolean; isPrimaryKe
 
           <div class="flex justify-center gap-3 mt-5">
             <button (click)="reset()" class="btn btn-secondary">
-              {{ isWalkInSuccess ? 'Register Another Walk-In' : 'Confirm Another Attendee' }}
+              {{ isWalkInSuccess ? 'Back to Attendance Confirmation Page' : 'Confirm Another Attendee' }}
             </button>
           </div>
         </div>
@@ -312,38 +361,132 @@ type WalkInField = { key: string; label: string; isCustom?: boolean; isPrimaryKe
   `,
   styles: [`
     .confirm-wrapper {
-      padding: 3rem 1.25rem 5rem;
+      padding: 2rem 1.25rem 4rem;
+      min-height: 100vh;
     }
-    .page-header {
+    .event-hero-card {
+      background: var(--flat-white);
+      border: 2px solid var(--flat-dark);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
       margin-bottom: 2rem;
     }
-    .page-tag {
+    .event-banner-img {
+      height: 200px;
+      position: relative;
+      overflow: hidden;
+      padding: 1rem 1.25rem;
+      background-repeat: no-repeat;
+      background-color: #111;
+    }
+    .banner-top-badge {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .category-pill {
+      background: var(--flat-dark);
+      color: var(--flat-white);
       font-size: 0.7rem;
+      font-weight: 800;
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--radius-sm);
+      letter-spacing: 0.05em;
+    }
+    .hero-body {
+      padding: 1.75rem;
+    }
+    .event-badge-label {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--flat-primary);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 0.35rem;
+    }
+    .event-title {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--flat-dark);
+      line-height: 1.2;
+    }
+    .event-tagline {
+      font-size: 1rem;
+      color: var(--flat-gray-600);
+      margin-top: 0.4rem;
+    }
+    .event-schedule-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    @media (max-width: 640px) {
+      .event-schedule-grid { grid-template-columns: 1fr; }
+    }
+    .schedule-box {
+      background: var(--flat-gray-50);
+      border: 1px solid var(--flat-border);
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+    }
+    .s-icon { font-size: 1.25rem; }
+    .s-label {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--flat-gray-500);
+      text-transform: uppercase;
+    }
+    .s-val {
+      font-size: 0.9rem;
+      color: var(--flat-dark);
+    }
+    .deadline-strip {
+      margin-top: 1.25rem;
+      padding: 0.75rem 1rem;
+      background: var(--flat-gray-100);
+      border-radius: var(--radius-md);
+    }
+    .closed-alert {
+      margin-top: 1.25rem;
+      padding: 1rem;
+      background: var(--flat-coral-light);
+      color: var(--flat-coral-dark);
+      border: 1px solid var(--flat-coral);
+      border-radius: var(--radius-md);
+      text-align: center;
+    }
+    .attendance-section-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .page-tag {
+      font-size: 0.75rem;
       font-weight: 800;
       color: var(--flat-primary);
       letter-spacing: 0.08em;
       text-transform: uppercase;
+      display: block;
+      margin-bottom: 0.35rem;
     }
-    .page-title {
-      font-size: 2rem;
-      font-weight: 800;
-      color: var(--flat-dark);
-      letter-spacing: -0.02em;
-      margin: 0.25rem 0;
-    }
-    .page-sub { font-size: 0.95rem; }
-    .event-meta-strip {
-      display: flex;
-      gap: 1.25rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      font-size: 0.82rem;
-      color: var(--flat-gray-600, #57606a);
-      margin-top: 0.5rem;
+    .page-sub {
+      font-size: 0.95rem;
+      margin-bottom: 0;
     }
     .lookup-card, .confirm-card, .success-card {
-      max-width: 640px;
+      background: var(--flat-white);
+      border: 2px solid var(--flat-dark);
+      border-radius: var(--radius-xl);
+      padding: 2.25rem;
       margin: 0 auto;
+    }
+    @media (max-width: 640px) {
+      .lookup-card, .confirm-card, .success-card { padding: 1.25rem; }
     }
     .search-form {
       display: flex;
@@ -535,13 +678,47 @@ export class AttendanceConfirmationComponent implements OnInit {
     private toastService: ToastService
   ) {}
 
+  get isRegistrationOpen(): boolean {
+    if (!this.event) return false;
+    return this.event.status === 'registration-open' || this.event.status === 'ongoing';
+  }
+
+  get remainingSlots(): number {
+    if (!this.event) return 0;
+    const current = this.registrationService.getRegistrationsForEvent(this.event.id).length;
+    return Math.max(0, this.event.capacity - current);
+  }
+
   ngOnInit(): void {
-    const eventId = this.route.snapshot.paramMap.get('eventId');
-    if (eventId) {
-      this.event = this.eventService.getEventById(eventId);
-      if (this.event) {
-        this.loadWalkInFields(eventId);
+    // 1. Check for compressed payload in query parameter (works for fresh phones/browsers with no prior storage)
+    const edParam = this.route.snapshot.queryParamMap.get('ed');
+    if (edParam) {
+      const hydrated = this.eventService.hydrateFromPayload(edParam);
+      if (hydrated) {
+        this.event = hydrated;
       }
+    }
+
+    // 2. Fallback to reading event from local storage by eventId parameter
+    const eventId = this.route.snapshot.paramMap.get('eventId');
+    if (eventId && !this.event) {
+      this.event = this.eventService.getEventById(eventId);
+    }
+
+    // 3. Fallback check window.location for any query param in SPA redirect edge cases
+    if (!this.event && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      const edRaw = params.get('ed') || params.get('q');
+      if (edRaw) {
+        const hydrated = this.eventService.hydrateFromPayload(edRaw);
+        if (hydrated) {
+          this.event = hydrated;
+        }
+      }
+    }
+
+    if (this.event) {
+      this.loadWalkInFields(this.event.id);
     }
     this.eventLoadAttempted = true;
   }
@@ -663,13 +840,19 @@ export class AttendanceConfirmationComponent implements OnInit {
     if (!this.selected || !this.event) return;
     this.isConfirming = true;
     setTimeout(() => {
-      const updated = this.registrationService.updateRegistration(this.selected!.id, { rsvpStatus: 'attending' });
+      const nowIso = new Date().toISOString();
+      const updated = this.registrationService.updateRegistration(this.selected!.id, {
+        rsvpStatus: 'attending',
+        checkInStatus: true,
+        checkInTime: nowIso,
+        checkedInBy: 'On-Site Attendance Confirmation'
+      });
       this.isConfirming = false;
       if (updated) {
         this.confirmed = updated;
         this.isWalkInSuccess = false;
         this.step = 'success';
-        this.toastService.success('Confirmed!', `${updated.firstName} ${updated.lastName} is confirmed as Attending.`);
+        this.toastService.success('Confirmed & Checked In!', `${updated.firstName} ${updated.lastName} is confirmed and checked in.`);
       } else {
         this.toastService.error('Error', 'Could not update registration. Please try again.');
       }

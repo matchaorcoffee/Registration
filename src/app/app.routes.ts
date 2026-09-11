@@ -35,6 +35,10 @@ export const routes: Routes = [
     path: 'event/:eventId/confirm',
     loadComponent: () => import('./features/public/attendance-confirmation.component').then(m => m.AttendanceConfirmationComponent)
   },
+  {
+    path: 'event/:eventId/scan',
+    loadComponent: () => import('./features/public/attendance-scan.component').then(m => m.AttendanceScanComponent)
+  },
 
   // Organizer Protected Routes
   {

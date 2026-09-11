@@ -1,6 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { Subject, combineLatest } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { EventService } from '../../core/services/event.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Event } from '../../core/models/event.model';
@@ -167,22 +169,23 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
         </div>
       </section>
 
-      <!-- Live Demo Events Showcase -->
+      <!-- Live Organizer Events Showcase -->
       <section class="demo-events-section">
         <div class="container">
           <div class="section-heading flex justify-between items-center">
             <div>
-              <span class="section-tag">EXPLORE SAMPLE EVENTS</span>
-              <h2>Active Events Ready to Test</h2>
+              <span class="section-tag">YOUR ACTIVE EVENTS</span>
+              <h2>Active Events</h2>
             </div>
             <a routerLink="/dashboard" class="btn btn-secondary">Go to Organizer Hub →</a>
           </div>
 
-          <div class="grid grid-cols-3 gap-6">
+          <!-- Events Grid -->
+          <div *ngIf="events.length > 0" class="grid grid-cols-3 gap-6">
             <div *ngFor="let evt of events" class="event-demo-card">
               <div class="event-demo-img"
                 [style.backgroundImage]="'url(' + evt.bannerUrl + ')'"
-                [style.backgroundSize]="evt.bannerImgW ? (evt.bannerImgW + 'px ' + evt.bannerImgH + 'px') : 'contain'"
+                [style.backgroundSize]="evt.bannerImgW ? (evt.bannerImgW + 'px ' + evt.bannerImgH + 'px') : 'cover'"
                 [style.backgroundPosition]="evt.bannerImgW ? (evt.bannerOffsetX + 'px ' + evt.bannerOffsetY + 'px') : 'center'"
               >
                 <app-status-badge class="demo-status-badge" [status]="evt.status"></app-status-badge>
@@ -205,6 +208,18 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Clean Empty State when Organizer has no events -->
+          <div *ngIf="events.length === 0" class="empty-events-box text-center py-8">
+            <div class="text-3xl mb-2">📅</div>
+            <h3 class="text-lg font-extrabold text-dark">You haven't created any events yet.</h3>
+            <p class="text-muted text-sm max-w-md mx-auto mt-1 mb-4">
+              Get started by creating your first event to enable RSVP, attendee check-ins, and QR passes.
+            </p>
+            <a routerLink="/events/create" class="btn btn-primary btn-sm">
+              + Create New Event
+            </a>
           </div>
         </div>
       </section>
@@ -524,17 +539,46 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
       padding-top: 0.5rem;
     }
 
+    .empty-events-box {
+      background: var(--flat-surface);
+      border: 2px dashed var(--flat-border);
+      border-radius: var(--radius-lg);
+      padding: 3rem 1.5rem;
+    }
+
     @media (max-width: 900px) {
       .hero-grid { grid-template-columns: 1fr; }
     }
   `]
 })
-export class LandingComponent implements OnInit {
+export class LandingComponent implements OnInit, OnDestroy {
   events: Event[] = [];
+  private destroy$ = new Subject<void>();
 
   constructor(private eventService: EventService, public authService: AuthService) {}
 
   ngOnInit(): void {
-    this.events = this.eventService.getEvents().slice(0, 3);
+    combineLatest([
+      this.authService.currentUser$,
+      this.eventService.events$
+    ]).pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(([user]) => {
+      this.loadOrganizerEvents(user?.id);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  private loadOrganizerEvents(userId?: string): void {
+    const currentUserId = userId || this.authService.currentUserValue?.id;
+    if (currentUserId) {
+      this.events = this.eventService.getEvents(currentUserId);
+    } else {
+      this.events = [];
+    }
   }
 }

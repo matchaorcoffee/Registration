@@ -8,27 +8,37 @@ import { StatCardComponent } from '../../../shared/components/stat-card/stat-car
 import { RsvpBadgeComponent } from '../../../shared/components/rsvp-badge/rsvp-badge.component';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 
+import { ModalComponent } from '../../../shared/components/modal/modal.component';
+import { QRCodeService } from '../../../core/services/qrcode.service';
+import { ToastService } from '../../../core/services/toast.service';
+
 @Component({
   selector: 'app-event-overview-tab',
   standalone: true,
-  imports: [CommonModule, RouterLink, StatCardComponent, RsvpBadgeComponent, StatusBadgeComponent],
+  imports: [CommonModule, RouterLink, StatCardComponent, RsvpBadgeComponent, StatusBadgeComponent, ModalComponent],
   template: `
     <div class="overview-tab" *ngIf="event">
       <!-- Quick Action Bar -->
       <div class="quick-actions-bar flat-card">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
           <span class="action-bar-label">Event Day Actions:</span>
-          <a *ngIf="event.isQrEnabled !== false" [routerLink]="['/events', event.id, 'check-in']" class="btn btn-emerald">
-            📷 Open QR Check-In Terminal
-          </a>
           <a [routerLink]="['/events', event.id, 'import']" class="btn btn-secondary">
             📁 Import Excel Attendees
           </a>
           <a [routerLink]="['/event', event.id, 'confirm']" target="_blank" class="btn btn-primary">
             ✅ Confirm Attendance
           </a>
+          <a [routerLink]="['/event', event.id, 'scan']" target="_blank" class="btn btn-primary">
+            📷 Scan Attendance QR
+          </a>
+          <button (click)="openAttendanceQrModal()" class="btn btn-outline">
+            📱 Show Attendance QR
+          </button>
           <a [routerLink]="['/event', event.id, 'register']" target="_blank" class="btn btn-outline">
             ↗ Public Registration Page
+          </a>
+          <a *ngIf="event.isQrEnabled !== false" [routerLink]="['/events', event.id, 'check-in']" class="btn btn-emerald">
+            Open Check-In Terminal
           </a>
         </div>
       </div>
@@ -138,6 +148,35 @@ import { StatusBadgeComponent } from '../../../shared/components/status-badge/st
           </div>
         </div>
       </div>
+
+      <!-- Modal: Show Attendance Confirmation QR for Attendees to scan -->
+      <app-modal [isOpen]="isAttendanceQrModalOpen" title="Attendance Confirmation QR" (close)="isAttendanceQrModalOpen = false">
+        <div class="text-center py-4">
+          <p class="text-sm text-muted mb-4">
+            Display or print this QR code on-site. Attendees can scan this code with their phones to open the <strong>Confirm Attendance</strong> page for <strong>{{ event.name }}</strong>.
+          </p>
+
+          <div class="modal-qr-box mb-4">
+            <img *ngIf="attendanceQrDataUrl" [src]="attendanceQrDataUrl" alt="Attendance Confirmation QR" class="modal-qr-img" />
+            <div *ngIf="!attendanceQrDataUrl" class="text-sm text-muted">Generating QR code...</div>
+          </div>
+
+          <div class="qr-target-url-box mb-4">
+            <span class="text-2xs font-bold text-muted uppercase">Target Confirmation URL:</span>
+            <code class="block text-xs font-mono text-primary mt-1 select-all break-all">{{ attendanceConfirmationUrl }}</code>
+          </div>
+
+          <div class="flex justify-center gap-3">
+            <button (click)="downloadAttendanceQr()" class="btn btn-primary btn-sm">
+              💾 Download QR (PNG)
+            </button>
+            <button (click)="copyAttendanceUrl()" class="btn btn-secondary btn-sm">
+              📋 Copy Link
+            </button>
+          </div>
+        </div>
+      </app-modal>
+
     </div>
   `,
   styles: [`
@@ -232,16 +271,44 @@ import { StatusBadgeComponent } from '../../../shared/components/status-badge/st
     .mt-6 { margin-top: 1.5rem; }
     .mb-6 { margin-bottom: 1.5rem; }
     .mt-3 { margin-top: 0.75rem; }
+    .modal-qr-box {
+      width: 260px;
+      height: 260px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 2px solid var(--flat-border);
+      border-radius: var(--radius-md);
+      padding: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-qr-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .qr-target-url-box {
+      background: var(--flat-gray-50);
+      padding: 0.75rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--flat-border);
+    }
   `]
 })
 export class EventOverviewTabComponent implements OnInit {
   event?: Event;
   registrations: Registration[] = [];
+  isAttendanceQrModalOpen = false;
+  attendanceQrDataUrl = '';
+  attendanceConfirmationUrl = '';
 
   constructor(
     private route: ActivatedRoute,
     private eventService: EventService,
-    private registrationService: RegistrationService
+    private registrationService: RegistrationService,
+    private qrService: QRCodeService,
+    private toast: ToastService
   ) {}
 
   ngOnInit(): void {
@@ -292,5 +359,40 @@ export class EventOverviewTabComponent implements OnInit {
     if (!isoString) return '';
     const date = new Date(isoString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async openAttendanceQrModal(): Promise<void> {
+    if (!this.event) return;
+
+    const baseHref = (document.querySelector('base')?.getAttribute('href') ?? '/').replace(/\/$/, '');
+    const base = `${window.location.origin}${baseHref}`;
+    this.attendanceConfirmationUrl = `${base}/event/${this.event.id}/confirm`;
+    this.isAttendanceQrModalOpen = true;
+
+    try {
+      this.attendanceQrDataUrl = await this.qrService.generateQRCodeDataUrl(this.attendanceConfirmationUrl);
+    } catch (e) {
+      console.error('Failed to generate Attendance QR', e);
+    }
+  }
+
+  downloadAttendanceQr(): void {
+    if (!this.attendanceQrDataUrl || !this.event) return;
+    const a = document.createElement('a');
+    a.href = this.attendanceQrDataUrl;
+    a.download = `${this.event.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_Attendance_QR.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    this.toast.success('Attendance Confirmation QR code downloaded!');
+  }
+
+  copyAttendanceUrl(): void {
+    if (!this.attendanceConfirmationUrl) return;
+    navigator.clipboard.writeText(this.attendanceConfirmationUrl).then(() => {
+      this.toast.success('Attendance confirmation link copied to clipboard!');
+    }).catch(() => {
+      this.toast.error('Could not copy to clipboard.');
+    });
   }
 }
